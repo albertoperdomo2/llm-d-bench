@@ -14,6 +14,9 @@ benchmark:
   # Job name
   name: guidellm-test
 
+  # Image
+  image: image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduler/guidellm-runner:latest 
+
   # Environment variables for the benchmark container
   # Add any GUIDELLM__ prefixed vars here
   env:

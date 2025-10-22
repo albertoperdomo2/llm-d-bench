@@ -23,6 +23,10 @@
           "type": "string",
           "description": "Job name"
         },
+        "image": {
+          "type": "string",
+          "description": "Image"
+        },
         "targetUrl": {
           "type": "string",
           "description": "Target URL for the benchmark"
