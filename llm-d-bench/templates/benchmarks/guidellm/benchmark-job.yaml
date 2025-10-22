@@ -35,15 +35,15 @@ spec:
             set -euo pipefail
 
             export RUN_DIR="/results/run_$(date +%s)"
-            mkdir -p $${RUN_DIR}
-            export GUIDELLM__LOGGING__LOG_FILE="$${RUN_DIR}/console.log"
+            mkdir -p ${RUN_DIR}
+            export GUIDELLM__LOGGING__LOG_FILE="${RUN_DIR}/console.log"
 
             echo "[JOB] Creating cache directory..."
             mkdir -p /results/.huggingface
             export HF_HOME="/results/.huggingface"
 
             echo "[JOB] Logging into Hugging Face..."
-            hf auth login --token $$HF_CLI_TOKEN
+            hf auth login --token $HF_CLI_TOKEN
 
             echo "[JOB] Running guidellm..."
             guidellm benchmark run \
@@ -74,9 +74,9 @@ spec:
               {{- if .Values.benchmark.additionalArgs }}
               {{ .Values.benchmark.additionalArgs }} \
               {{- end }}
-              --output-path $${RUN_DIR}/output.json
+              --output-path ${RUN_DIR}/output.json
 
-            echo "[JOB] Results saved to $${RUN_DIR}"
+            echo "[JOB] Results saved to ${RUN_DIR}"
         volumeMounts:
         - name: results
           mountPath: /results
