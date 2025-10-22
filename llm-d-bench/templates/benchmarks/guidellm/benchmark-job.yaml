@@ -62,10 +62,10 @@ spec:
               --rate-type={{ .Values.benchmark.rateType }} \
               {{- end }}
               {{- if .Values.benchmark.rate }}
-              --rate={{ .Values.benchmark.rate }} \
+              --rate={{ if kindIs "slice" .Values.benchmark.rate }}{{ join "," .Values.benchmark.rate }}{{ else }}{{ .Values.benchmark.rate }}{{ end }} \
               {{- end }}
               {{- if .Values.benchmark.data }}
-              --data={{ .Values.benchmark.data }} \
+              --data={{ if kindIs "slice" .Values.benchmark.data }}{{ join "," .Values.benchmark.data }}{{ else }}{{ .Values.benchmark.data }}{{ end }} \
               {{- end }}
               {{- if .Values.benchmark.maxSeconds }}
               --max-seconds={{ .Values.benchmark.maxSeconds }} \
@@ -93,10 +93,10 @@ spec:
               --rate-type={{ .Values.benchmark.rateType }} \
               {{- end }}
               {{- if .Values.benchmark.rate }}
-              --rate={{ .Values.benchmark.rate }} \
+              --rate={{ if kindIs "slice" .Values.benchmark.rate }}{{ join "," .Values.benchmark.rate }}{{ else }}{{ .Values.benchmark.rate }}{{ end }} \
               {{- end }}
               {{- if .Values.benchmark.data }}
-              --data={{ .Values.benchmark.data }} \
+              --data={{ if kindIs "slice" .Values.benchmark.data }}{{ join "," .Values.benchmark.data }}{{ else }}{{ .Values.benchmark.data }}{{ end }} \
               {{- end }}
               {{- if .Values.benchmark.maxSeconds }}
               --max-seconds={{ .Values.benchmark.maxSeconds }} \

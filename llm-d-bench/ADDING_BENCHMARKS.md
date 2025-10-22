@@ -116,10 +116,24 @@ pvc:
 ### 5. Test
 
 ```bash
+# Lint the chart
 helm lint ./llm-d-bench
+
+# Test template rendering with values file
 helm template test ./llm-d-bench -f examples/your-tool-example.yaml
+
+# Test template rendering with --set (for comma-separated values)
+helm template test ./llm-d-bench \
+  --set benchmark.target=http://service:8080 \
+  --set benchmark.model=your-model \
+  --set 'benchmark.rate={1,50,100}' \
+  --set 'benchmark.data={param1=value1,param2=value2}'
+
+# Install
 helm install test ./llm-d-bench -f examples/your-tool-example.yaml -n keda
 ```
+
+**Note:** When using `--set` with comma-separated values (like rates or complex parameters), wrap them in curly braces `{value1,value2}`. The template will automatically join them back into a comma-separated string.
 
 ## Key Points
 
@@ -128,6 +142,20 @@ helm install test ./llm-d-bench -f examples/your-tool-example.yaml -n keda
 - Include nodeSelector and affinity support for scheduling control
 - Add resource limits
 - Use the shared PVC from `_common/pvc.yaml`
+
+### Handling Comma-Separated Values
+
+If your tool needs comma-separated parameters (like rates or complex configurations), use this pattern in your template:
+
+```yaml
+{{- if .Values.benchmark.rate }}
+--rate={{ if kindIs "slice" .Values.benchmark.rate }}{{ join "," .Values.benchmark.rate }}{{ else }}{{ .Values.benchmark.rate }}{{ end }} \
+{{- end }}
+```
+
+This handles both cases:
+- **Values file**: `rate: "1,50,100"` → passes through as string
+- **--set flag**: `--set 'benchmark.rate={1,50,100}'` → Helm converts to array, template joins it back
 
 ## Cleanup Job (Optional)
 

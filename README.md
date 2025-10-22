@@ -14,7 +14,7 @@ oc create secret generic huggingface-token \
 helm install my-benchmark ./llm-d-bench \
   --set benchmark.target=http://llm-service:8080 \
   --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
-  --set benchmark.rate="1,50,100" \
+  --set 'benchmark.rate={1,50,100}' \
   -n keda
 
 # Monitor
@@ -30,8 +30,8 @@ Key parameters in `values.yaml`:
 | `jobType` | `benchmark` or `cleanup` | `benchmark` |
 | `benchmark.target` | Target LLM endpoint | - |
 | `benchmark.model` | Model name | - |
-| `benchmark.rate` | Concurrent rates (e.g., "1,50,100") | - |
-| `benchmark.data` | Number of requests | `1000` |
+| `benchmark.rate` | Concurrent rates (e.g., `{1,50,100}` with --set) | - |
+| `benchmark.data` | Number of requests or token specs (e.g., `{prompt_tokens=1000,output_tokens=1000}` with --set) | `1000` |
 | `benchmark.maxSeconds` | Max runtime | `600` |
 | `benchmark.nodeSelector` | Node selector for scheduling | See values.yaml |
 | `benchmark.affinity` | Node affinity rules (excludes GPU nodes) | See values.yaml |
@@ -44,6 +44,26 @@ Key parameters in `values.yaml`:
 ```bash
 helm install test ./llm-d-bench -f examples/benchmark-example.yaml -n keda
 ```
+
+### With command-line parameters
+```bash
+# Basic benchmark with rate list
+helm install my-test ./llm-d-bench \
+  --set benchmark.target=http://llm-service:8080 \
+  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
+  --set 'benchmark.rate={1,50,100}' \
+  -n keda
+
+# Advanced benchmark with token specifications
+helm install my-test ./llm-d-bench \
+  --set benchmark.target=http://llm-service:8080 \
+  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
+  --set 'benchmark.rate={1,50,100,200}' \
+  --set 'benchmark.data={prompt_tokens=1000,output_tokens=1000}' \
+  -n keda
+```
+
+**Note:** When using `--set` with comma-separated values, wrap them in curly braces `{value1,value2}` so Helm handles them correctly.
 
 ### Cleanup results
 ```bash
