@@ -3,7 +3,7 @@ apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
   name: guidellm-runner
-  namespace: keda
+  namespace: llm-d-inference-scheduler
 spec:
   # just keep the last build
   successfulBuildsHistoryLimit: 1
