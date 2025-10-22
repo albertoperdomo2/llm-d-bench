@@ -7,6 +7,10 @@ jobType: benchmark
 benchmark:
   name: llama-benchmark-test
 
+  image:
+    repository: "image_repo"
+    tag: "latest"
+
   env:
     GUIDELLM__REQUEST_TIMEOUT: "1000"
     GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL: "INFO"

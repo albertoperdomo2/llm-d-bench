@@ -219,8 +219,6 @@ See [ADDING_BENCHMARKS.md](llm-d-bench/ADDING_BENCHMARKS.md) for detailed instru
 
 - [Helm Chart README](llm-d-bench/README.md) - Comprehensive chart documentation
 - [Adding Benchmarks Guide](llm-d-bench/ADDING_BENCHMARKS.md) - How to add new benchmark tools
-- [Architecture](ARCHITECTURE.md) - System architecture and data flow
-- [Quick Start](QUICKSTART.md) - Quick reference guide
 - [Example Values](llm-d-bench/examples/) - Pre-configured examples
 
 ## Troubleshooting

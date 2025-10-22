@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: guidellm
-        image: {{ .Values.benchmark.image }}
+        image: "{{ .Values.benchmark.image.repository }}:{{ .Values.benchmark.image.tag }}"
         env:
           - name: HF_CLI_TOKEN
             valueFrom:

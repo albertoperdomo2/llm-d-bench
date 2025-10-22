@@ -182,15 +182,15 @@ pvc:
 
 ```bash
 # Lint the chart
-helm lint ./helm-chart/llm-d-bench
+helm lint ./llm-d-bench
 
 # Dry-run to see rendered templates
-helm template test ./helm-chart/llm-d-bench \
+helm template test ./llm-d-bench \
   -f examples/your-benchmark-tool-example.yaml \
   --namespace keda
 
 # Install for real
-helm install test ./helm-chart/llm-d-bench \
+helm install test ./llm-d-bench \
   -f examples/your-benchmark-tool-example.yaml \
   -n keda
 ```
@@ -340,10 +340,10 @@ pvc:
 
 After adding a new benchmark tool:
 
-1. **Lint**: `helm lint ./helm-chart/llm-d-bench`
-2. **Template**: `helm template test ./helm-chart/llm-d-bench -f your-example.yaml`
-3. **Dry-run**: `helm install test ./helm-chart/llm-d-bench -f your-example.yaml --dry-run`
-4. **Deploy**: `helm install test ./helm-chart/llm-d-bench -f your-example.yaml`
+1. **Lint**: `helm lint ./llm-d-bench`
+2. **Template**: `helm template test ./llm-d-bench -f your-example.yaml`
+3. **Dry-run**: `helm install test ./llm-d-bench -f your-example.yaml --dry-run`
+4. **Deploy**: `helm install test ./llm-d-bench -f your-example.yaml`
 5. **Verify**: `oc get jobs` and `oc logs job/your-job`
 
 ## Common Patterns
@@ -352,11 +352,11 @@ After adding a new benchmark tool:
 
 ```yaml
 # Run the same benchmark with different tools
-helm install guidellm-test ./helm-chart/llm-d-bench \
+helm install guidellm-test ./llm-d-bench \
   --set benchmarkTool=guidellm \
   -f benchmark-config.yaml
 
-helm install locust-test ./helm-chart/llm-d-bench \
+helm install locust-test ./llm-d-bench \
   --set benchmarkTool=locust \
   -f benchmark-config.yaml
 ```
