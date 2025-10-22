@@ -1,0 +1,96 @@
+{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "guidellm") }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.benchmark.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: llm-d-bench
+    job-type: benchmark
+spec:
+  template:
+    metadata:
+      labels:
+        app: llm-d-bench
+        job: {{ .Values.benchmark.name }}
+    spec:
+      containers:
+      - name: guidellm
+        image: image-registry.openshift-image-registry.svc:5000/keda/guidellm-runner:latest
+        env:
+          - name: HF_CLI_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-token
+                key: HF_CLI_TOKEN
+          {{- range $key, $value := .Values.benchmark.env }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+        command: ["/bin/bash"]
+        args:
+          - -c
+          - |
+            set -euo pipefail
+
+            export RUN_DIR="/results/run_$(date +%s)"
+            mkdir -p $${RUN_DIR}
+            export GUIDELLM__LOGGING__LOG_FILE="$${RUN_DIR}/console.log"
+
+            echo "[JOB] Creating cache directory..."
+            mkdir -p /results/.huggingface
+            export HF_HOME="/results/.huggingface"
+
+            echo "[JOB] Logging into Hugging Face..."
+            hf auth login --token $$HF_CLI_TOKEN
+
+            echo "[JOB] Running guidellm..."
+            guidellm benchmark run \
+              {{- if .Values.benchmark.target }}
+              --target {{ .Values.benchmark.target }} \
+              {{- end }}
+              {{- if .Values.benchmark.model }}
+              --model {{ .Values.benchmark.model }} \
+              {{- end }}
+              {{- if .Values.benchmark.processor }}
+              --processor {{ .Values.benchmark.processor }} \
+              {{- end }}
+              {{- if .Values.benchmark.backendType }}
+              --backend-type {{ .Values.benchmark.backendType }} \
+              {{- end }}
+              {{- if .Values.benchmark.rateType }}
+              --rate-type={{ .Values.benchmark.rateType }} \
+              {{- end }}
+              {{- if .Values.benchmark.rate }}
+              --rate={{ .Values.benchmark.rate }} \
+              {{- end }}
+              {{- if .Values.benchmark.data }}
+              --data={{ .Values.benchmark.data }} \
+              {{- end }}
+              {{- if .Values.benchmark.maxSeconds }}
+              --max-seconds={{ .Values.benchmark.maxSeconds }} \
+              {{- end }}
+              {{- if .Values.benchmark.additionalArgs }}
+              {{ .Values.benchmark.additionalArgs }} \
+              {{- end }}
+              --output-path $${RUN_DIR}/output.json
+
+            echo "[JOB] Results saved to $${RUN_DIR}"
+        volumeMounts:
+        - name: results
+          mountPath: /results
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
+      volumes:
+      - name: results
+        persistentVolumeClaim:
+          claimName: {{ .Values.pvc.name }}
+      restartPolicy: Never
+  backoffLimit: 2
+{{- end }}

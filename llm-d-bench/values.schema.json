@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "description": "Namespace to deploy resources"
+        }
+      }
+    },
+    "jobType": {
+      "type": "string",
+      "enum": ["benchmark", "cleanup", "none"],
+      "description": "Type of job to deploy"
+    },
+    "benchmark": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Job name"
+        },
+        "targetUrl": {
+          "type": "string",
+          "description": "Target URL for the benchmark"
+        },
+        "modelName": {
+          "type": "string",
+          "description": "Model name"
+        },
+        "dataProfile": {
+          "type": "string",
+          "description": "Data profile"
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"]
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "memory": {
+                  "type": "string"
+                },
+                "cpu": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "memory": {
+                  "type": "string"
+                },
+                "cpu": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of retries before marking job as failed"
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Cleanup job name"
+        },
+        "serviceAccountName": {
+          "type": "string",
+          "description": "Service account for cleanup job"
+        }
+      }
+    },
+    "pvc": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "description": "Whether to create a new PVC"
+        },
+        "name": {
+          "type": "string",
+          "description": "PVC name"
+        },
+        "storageClassName": {
+          "type": "string",
+          "description": "Storage class name"
+        },
+        "accessModes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"]
+          }
+        },
+        "size": {
+          "type": "string",
+          "pattern": "^[0-9]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
+          "description": "Storage size"
+        },
+        "mountPath": {
+          "type": "string",
+          "description": "Mount path in containers"
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "description": "Additional labels to apply to all resources"
+    },
+    "annotations": {
+      "type": "object",
+      "description": "Additional annotations to apply to all resources"
+    }
+  }
+}

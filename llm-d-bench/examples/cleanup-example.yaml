@@ -1,0 +1,12 @@
+# Example: Run cleanup job
+
+namespace: keda
+benchmarkTool: guidellm
+jobType: cleanup
+
+cleanup:
+  name: results-cleanup
+
+pvc:
+  create: false
+  name: guidellm-pvc
