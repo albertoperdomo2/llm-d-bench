@@ -124,6 +124,10 @@ Pre-configured benchmark experiments are available in `llm-d-bench/experiments/`
 
 Create your own experiment files in this directory for repeatable benchmark scenarios.
 
+## Copy results
+
+Use the `cp.sh` script to copy the benchmark outputs to your local machine. 
+
 ## Documentation
 
 - `llm-d-bench/values.yaml` - Full configuration options
