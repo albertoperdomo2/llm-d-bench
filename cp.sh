@@ -5,7 +5,7 @@ IFS=$'\n\t'
 PVC_NAME="guidellm-pvc"
 NAMESPACE="llm-d-inference-scheduler"
 PVC_MOUNT_PATH="/results"
-LOCAL_DIR="/results"
+LOCAL_DIR="./results"
 
 if [ "$#" -lt 2 ]; then
     echo "Usage: $0 <remote-dir> <file1> [file2] [file3] ..."
@@ -45,13 +45,13 @@ spec:
 EOF
 
 echo "Waiting for pod to be ready..."
-oc wait --for=condition=Ready pod/pvc-copy-pod -n $NAMESPACE --timeout=60s
+oc wait --for=condition=Ready pod/pvc-copy-pod -n $NAMESPACE --timeout=180s
 
 echo "Copying files..."
 for file in "${FILES[@]}"; do
     for attempt in {1..3}; do
         echo "  Copying: $file (attempt: $attempt/3)"
-        if oc cp $NAMESPACE/pvc-copy-pod:$PVC_MOUNT_PATH/$REMOTE_DIR/$file "$LOCAL_DIR/$(basename $file)" -c copier; then
+        if oc cp $NAMESPACE/pvc-copy-pod:$PVC_MOUNT_PATH/$REMOTE_DIR/$file "$LOCAL_DIR/$REMOTE_DIR/$(basename $file)" -c copier; then
             break
         fi
         sleep 5
