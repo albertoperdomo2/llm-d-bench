@@ -72,11 +72,12 @@ cleanup:
 
 # PVC configuration
 pvc:
-  # Create the PVC (set to false if it already exists)
-  create: true
+  # Create the PVC (set to true if PVC doesn't exist yet)
+  # Set to false to reuse an existing PVC across multiple experiments
+  create: false
 
-  # PVC name
+  # PVC name - use the same name across experiments to share results
   name: guidellm-pvc
 
-  # PVC size
+  # PVC size (only applies if create: true)
   size: 50Gi

@@ -35,10 +35,29 @@ Key parameters in `values.yaml`:
 | `benchmark.maxSeconds` | Max runtime | `600` |
 | `benchmark.nodeSelector` | Node selector for scheduling | See values.yaml |
 | `benchmark.affinity` | Node affinity rules (excludes GPU nodes) | See values.yaml |
-| `pvc.create` | Create PVC for results | `true` |
+| `pvc.create` | Create PVC for results (set to false to reuse existing) | `false` |
 | `pvc.size` | Storage size | `50Gi` |
 
 ## Usage
+
+### With experiment configurations (recommended)
+Use pre-configured experiment files from `experiments/` directory:
+
+```bash
+# First time: Create PVC (set create: true in experiment file)
+helm install qwen-baseline ./llm-d-bench \
+  -f llm-d-bench/experiments/qwen-0.6b-baseline.yaml \
+  -n llm-d-inference-scheduler
+
+# Subsequent runs: Reuse existing PVC
+helm install qwen-test2 ./llm-d-bench \
+  -f llm-d-bench/experiments/qwen-0.6b-baseline.yaml \
+  --set pvc.create=false \
+  -n llm-d-inference-scheduler
+
+# Monitor progress
+oc logs -f job/qwen-0.6b-baseline -n llm-d-inference-scheduler
+```
 
 ### With custom values file
 ```bash
@@ -97,8 +116,17 @@ oc start-build guidellm-runner --from-dir=. --follow
 
 See [ADDING_BENCHMARKS.md](llm-d-bench/ADDING_BENCHMARKS.md).
 
+## Experiments
+
+Pre-configured benchmark experiments are available in `llm-d-bench/experiments/`:
+- `qwen-0.6b-baseline.yaml` - Qwen 0.6B baseline benchmark
+- `benchmark-example.yaml` - General example configuration
+
+Create your own experiment files in this directory for repeatable benchmark scenarios.
+
 ## Documentation
 
 - `llm-d-bench/values.yaml` - Full configuration options
+- `llm-d-bench/experiments/` - Pre-configured experiment files
 - `llm-d-bench/examples/` - Example configurations
 - `llm-d-bench/ADDING_BENCHMARKS.md` - Adding new tools

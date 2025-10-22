@@ -1,0 +1,32 @@
+# Qwen 0.6B Baseline Benchmark Experiment
+# Tests basic performance with simple token specifications
+
+jobType: benchmark
+
+benchmark:
+  name: qwen-0.6b-baseline
+
+  # Target inference endpoint
+  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduler.svc.cluster.local:80
+
+  # Model configuration
+  model: Qwen/Qwen3-0.6B
+  processor: Qwen/Qwen3-0.6B
+
+  # Benchmark parameters
+  rateType: concurrent
+  rate: "1"
+  data: "prompt_tokens=1000,output_tokens=1000"
+  maxSeconds: "600"
+
+  # Environment variables (optional)
+  env:
+    GUIDELLM__REQUEST_TIMEOUT: "1000"
+    GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL: "INFO"
+
+# PVC configuration
+# Set create: true only for the first experiment run, then set to false to reuse
+pvc:
+  create: false
+  name: guidellm-pvc
+  size: "20Gi"
