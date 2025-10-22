@@ -88,14 +88,9 @@ oc run -it --rm pvc-browser --image=busybox \
 
 ### OpenShift BuildConfig
 ```bash
-oc apply -f llm-d-bench/build/imagestream.yaml -n keda
-oc apply -f llm-d-bench/build/buildconfig.yaml -n keda
-oc start-build guidellm-runner -n keda
-```
-
-### Docker/Podman
-```bash
-docker build -f llm-d-bench/build/Dockerfile -t guidellm-runner:latest .
+oc apply -f llm-d-bench/build/imagestream.yaml
+oc apply -f llm-d-bench/build/buildconfig.yaml
+oc start-build guidellm-runner --from-dir=. --follow
 ```
 
 ## Adding Benchmark Tools
