@@ -41,5 +41,13 @@ spec:
         persistentVolumeClaim:
           claimName: {{ .Values.pvc.name }}
       restartPolicy: Never
+      {{- if .Values.cleanup.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.cleanup.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.cleanup.affinity }}
+      affinity:
+        {{- toYaml .Values.cleanup.affinity | nindent 8 }}
+      {{- end }}
   backoffLimit: 2
 {{- end }}

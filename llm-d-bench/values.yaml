@@ -15,7 +15,7 @@ benchmark:
   name: guidellm-test
 
   # Image
-  image: 
+  image:
     repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduler/guidellm-runner"
     tag: "latest"
 
@@ -39,10 +39,36 @@ benchmark:
   # Use this for any flags not covered by the above parameters
   additionalArgs: ""
 
+  # Node scheduling configuration
+  # Ensure benchmark jobs do not run on GPU nodes
+  nodeSelector:
+    node.kubernetes.io/instance-type: worker
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.present
+            operator: DoesNotExist
+
 # Cleanup job configuration
 cleanup:
   # Cleanup job name
   name: cleanup
+
+  # Node scheduling configuration
+  # Ensure cleanup jobs do not run on GPU nodes
+  nodeSelector:
+    node.kubernetes.io/instance-type: worker
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.present
+            operator: DoesNotExist
 
 # PVC configuration
 pvc:
