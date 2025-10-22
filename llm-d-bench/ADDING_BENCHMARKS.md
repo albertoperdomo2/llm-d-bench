@@ -1,401 +1,160 @@
 # Adding New Benchmark Tools
 
-This directory contains benchmark tool implementations. Each benchmark tool has its own subdirectory with specific job templates.
+Guide for adding support for new benchmark tools to the chart.
 
-## Current Benchmark Tools
+## Directory Structure
 
-- **guidellm/** - GuideLLM benchmark tool (default)
-- **_common/** - Shared templates (PVC, etc.)
+```
+templates/benchmarks/
+├── _common/          # Shared templates (PVC)
+├── guidellm/         # GuideLLM (default)
+└── your-tool/        # Your new tool
+```
 
-## Adding a New Benchmark Tool
+## Steps
 
-To add support for a new benchmark tool (e.g., `locust`, `k6`, `artillery`), follow these steps:
-
-### 1. Create Benchmark Directory
+### 1. Create Tool Directory
 
 ```bash
-mkdir -p templates/benchmarks/your-benchmark-tool
+mkdir -p templates/benchmarks/your-tool
 ```
 
 ### 2. Create Benchmark Job Template
 
-Create `templates/benchmarks/your-benchmark-tool/benchmark-job.yaml`:
+`templates/benchmarks/your-tool/benchmark-job.yaml`:
 
 ```yaml
-{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "your-benchmark-tool") }}
+{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "your-tool") }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "llm-d-bench.benchmarkJobName" . }}
-  namespace: {{ include "llm-d-bench.namespace" . }}
+  name: {{ .Values.benchmark.name }}
+  namespace: {{ .Values.namespace }}
   labels:
-    {{- include "llm-d-bench.labels" . | nindent 4 }}
+    app: llm-d-bench
     job-type: benchmark
-    benchmark-tool: your-benchmark-tool
 spec:
   template:
-    metadata:
-      labels:
-        {{- include "llm-d-bench.selectorLabels" . | nindent 8 }}
-        job: {{ include "llm-d-bench.benchmarkJobName" . }}
-        job-type: benchmark
     spec:
       containers:
-      - name: benchmark-container
-        image: {{ .Values.benchmark.image.repository }}:{{ .Values.benchmark.image.tag }}
-        imagePullPolicy: {{ .Values.benchmark.image.pullPolicy }}
+      - name: benchmark
+        image: "{{ .Values.benchmark.image.repository }}:{{ .Values.benchmark.image.tag }}"
         command: ["/bin/bash"]
         args:
           - -c
           - |
-            set -euo pipefail
+            export RUN_DIR="/results/run_$(date +%s)"
+            mkdir -p ${RUN_DIR}
 
-            # Your benchmark tool commands here
-            echo "[JOB] Running your-benchmark-tool..."
-
-            # Save results to PVC
-            export RUN_DIR="{{ .Values.pvc.mountPath }}/run_$(date +%s)"
-            mkdir -p $${RUN_DIR}
-
-            # Run your benchmark and save output
-            your-benchmark-tool run \
-              --target {{ .Values.benchmark.targetUrl }} \
-              --output $${RUN_DIR}/output.json
-
-            echo "[JOB] Results saved to $${RUN_DIR}"
+            your-tool run \
+              --target {{ .Values.benchmark.target }} \
+              --output ${RUN_DIR}/output.json
         volumeMounts:
         - name: results
-          mountPath: {{ .Values.pvc.mountPath }}
+          mountPath: /results
         resources:
-          {{- toYaml .Values.benchmark.resources | nindent 10 }}
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1000m"
       volumes:
       - name: results
         persistentVolumeClaim:
-          claimName: {{ include "llm-d-bench.pvcName" . }}
+          claimName: {{ .Values.pvc.name }}
       restartPolicy: Never
-  backoffLimit: {{ .Values.benchmark.backoffLimit }}
+      {{- if .Values.benchmark.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.benchmark.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.benchmark.affinity }}
+      affinity:
+        {{- toYaml .Values.benchmark.affinity | nindent 8 }}
+      {{- end }}
+  backoffLimit: 2
 {{- end }}
 ```
 
-### 3. Create Cleanup Job Template (Optional)
+### 3. Add Values Configuration
 
-Create `templates/benchmarks/your-benchmark-tool/cleanup-job.yaml`:
-
-```yaml
-{{- if and (eq .Values.jobType "cleanup") (eq .Values.benchmarkTool "your-benchmark-tool") }}
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {{ include "llm-d-bench.cleanupJobName" . }}
-  namespace: {{ include "llm-d-bench.namespace" . }}
-  labels:
-    {{- include "llm-d-bench.labels" . | nindent 4 }}
-    job-type: cleanup
-    benchmark-tool: your-benchmark-tool
-spec:
-  template:
-    metadata:
-      labels:
-        {{- include "llm-d-bench.selectorLabels" . | nindent 8 }}
-        job: {{ include "llm-d-bench.cleanupJobName" . }}
-        job-type: cleanup
-    spec:
-      containers:
-      - name: cleanup-container
-        image: {{ .Values.cleanup.image.repository }}:{{ .Values.cleanup.image.tag }}
-        command: ["/bin/bash"]
-        args:
-          - -c
-          - |
-            set -euo pipefail
-            echo "[JOB] Cleaning up benchmark results..."
-            rm -rf {{ .Values.pvc.mountPath }}/run_*
-            echo "[JOB] Cleanup done!"
-        volumeMounts:
-        - name: results
-          mountPath: {{ .Values.pvc.mountPath }}
-      volumes:
-      - name: results
-        persistentVolumeClaim:
-          claimName: {{ include "llm-d-bench.pvcName" . }}
-      restartPolicy: Never
-  backoffLimit: {{ .Values.cleanup.backoffLimit }}
-{{- end }}
-```
-
-### 4. Update values.yaml
-
-Add configuration section for your benchmark tool:
+In `values.yaml`:
 
 ```yaml
-# In values.yaml
-
-# Set this to your new tool name
-benchmarkTool: your-benchmark-tool
-
-benchmark:
-  name: my-benchmark
-  targetUrl: "http://your-service:8080"
-
-  # Tool-specific configuration
-  image:
-    repository: your-registry/your-benchmark-tool
-    tag: latest
-    pullPolicy: Always
-
-  # Add any tool-specific parameters
-  parameters:
-    duration: 300
-    users: 100
-    rampUp: 60
-```
-
-### 5. Create Example Values File
-
-Create `examples/your-benchmark-tool-example.yaml`:
-
-```yaml
-benchmarkTool: your-benchmark-tool
-jobType: benchmark
+benchmarkTool: your-tool
 
 benchmark:
   name: your-tool-test
-  targetUrl: http://llm-service:8080
-
   image:
-    repository: your-registry/your-benchmark-tool
+    repository: your-registry/your-tool
     tag: latest
+  target: ""
+  # Add tool-specific parameters
+```
 
-  parameters:
-    # Tool-specific parameters
-    duration: 600
-    users: 500
+### 4. Create Example File
+
+`examples/your-tool-example.yaml`:
+
+```yaml
+benchmarkTool: your-tool
+jobType: benchmark
+
+benchmark:
+  name: test
+  target: http://service:8080
+  image:
+    repository: your-registry/your-tool
+    tag: latest
 
 pvc:
   create: false
   name: llm-d-bench-pvc
 ```
 
-### 6. Test Your Implementation
+### 5. Test
 
 ```bash
-# Lint the chart
 helm lint ./llm-d-bench
-
-# Dry-run to see rendered templates
-helm template test ./llm-d-bench \
-  -f examples/your-benchmark-tool-example.yaml \
-  --namespace keda
-
-# Install for real
-helm install test ./llm-d-bench \
-  -f examples/your-benchmark-tool-example.yaml \
-  -n keda
+helm template test ./llm-d-bench -f examples/your-tool-example.yaml
+helm install test ./llm-d-bench -f examples/your-tool-example.yaml -n keda
 ```
 
-### 7. Document Your Tool
+## Key Points
 
-Add documentation to the main README about your new benchmark tool:
+- Use conditional rendering: `{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "your-tool") }}`
+- Save results to `/results/run_$(date +%s)/`
+- Include nodeSelector and affinity support for scheduling control
+- Add resource limits
+- Use the shared PVC from `_common/pvc.yaml`
 
-```markdown
-## Supported Benchmark Tools
+## Cleanup Job (Optional)
 
-### GuideLLM (Default)
-- Focus on LLM-specific benchmarks
-- OpenAI API compatible
-- Token-level metrics
-
-### Your Benchmark Tool
-- Brief description
-- Key features
-- Use cases
-```
-
-## Template Structure Best Practices
-
-### Use Consistent Naming
-
-- Container names should reflect the tool
-- Labels should include `benchmark-tool: <tool-name>`
-- Use standard helper functions from `_helpers.tpl`
-
-### Support Common Features
-
-- ✅ PVC mounting for results storage
-- ✅ Resource limits and requests
-- ✅ Configurable backoff limits
-- ✅ Results saved with timestamp
-- ✅ Clear logging
-
-### Environment Variables
-
-Access common values through `.Values`:
+`templates/benchmarks/your-tool/cleanup-job.yaml`:
 
 ```yaml
-env:
-  - name: TARGET_URL
-    value: {{ .Values.benchmark.targetUrl }}
-  - name: NAMESPACE
-    value: {{ include "llm-d-bench.namespace" . }}
-```
-
-### Secrets Management
-
-If your tool needs secrets:
-
-```yaml
-env:
-  - name: API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: {{ .Values.benchmark.secretName }}
-        key: {{ .Values.benchmark.secretKey }}
-```
-
-## Example: Adding Locust
-
-Here's a complete example for adding Locust support:
-
-### Directory Structure
-
-```
-templates/benchmarks/locust/
-├── benchmark-job.yaml
-└── cleanup-job.yaml
-```
-
-### benchmark-job.yaml
-
-```yaml
-{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "locust") }}
+{{- if and (eq .Values.jobType "cleanup") (eq .Values.benchmarkTool "your-tool") }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "llm-d-bench.benchmarkJobName" . }}
-  namespace: {{ include "llm-d-bench.namespace" . }}
-  labels:
-    {{- include "llm-d-bench.labels" . | nindent 4 }}
-    job-type: benchmark
-    benchmark-tool: locust
+  name: {{ .Values.cleanup.name }}
+  namespace: {{ .Values.namespace }}
 spec:
   template:
     spec:
       containers:
-      - name: locust-container
-        image: locustio/locust:latest
-        command: ["/bin/bash"]
-        args:
-          - -c
-          - |
-            export RUN_DIR="{{ .Values.pvc.mountPath }}/run_$(date +%s)"
-            mkdir -p $${RUN_DIR}
-
-            locust \
-              --host {{ .Values.benchmark.targetUrl }} \
-              --users {{ .Values.benchmark.parameters.users }} \
-              --spawn-rate {{ .Values.benchmark.parameters.spawnRate }} \
-              --run-time {{ .Values.benchmark.parameters.duration }}s \
-              --headless \
-              --only-summary \
-              --csv $${RUN_DIR}/results
+      - name: cleanup
+        image: registry.access.redhat.com/ubi9-micro:latest
+        command: ["/bin/bash", "-c", "rm -rf /results/run_*"]
         volumeMounts:
         - name: results
-          mountPath: {{ .Values.pvc.mountPath }}
+          mountPath: /results
       volumes:
       - name: results
         persistentVolumeClaim:
-          claimName: {{ include "llm-d-bench.pvcName" . }}
+          claimName: {{ .Values.pvc.name }}
       restartPolicy: Never
 {{- end }}
 ```
-
-### values file (examples/locust-example.yaml)
-
-```yaml
-benchmarkTool: locust
-jobType: benchmark
-
-benchmark:
-  name: locust-test
-  targetUrl: http://llm-service:8080
-
-  image:
-    repository: locustio/locust
-    tag: latest
-
-  parameters:
-    users: 100
-    spawnRate: 10
-    duration: 300
-
-pvc:
-  create: false
-  name: llm-d-bench-pvc
-```
-
-## Validation
-
-After adding a new benchmark tool:
-
-1. **Lint**: `helm lint ./llm-d-bench`
-2. **Template**: `helm template test ./llm-d-bench -f your-example.yaml`
-3. **Dry-run**: `helm install test ./llm-d-bench -f your-example.yaml --dry-run`
-4. **Deploy**: `helm install test ./llm-d-bench -f your-example.yaml`
-5. **Verify**: `oc get jobs` and `oc logs job/your-job`
-
-## Common Patterns
-
-### Pattern 1: Multiple Benchmark Runs
-
-```yaml
-# Run the same benchmark with different tools
-helm install guidellm-test ./llm-d-bench \
-  --set benchmarkTool=guidellm \
-  -f benchmark-config.yaml
-
-helm install locust-test ./llm-d-bench \
-  --set benchmarkTool=locust \
-  -f benchmark-config.yaml
-```
-
-### Pattern 2: Tool-Specific Configuration
-
-```yaml
-# In values.yaml, use nested config per tool
-guidellm:
-  rates: "1,50,100,200"
-  maxSeconds: 600
-
-locust:
-  users: 100
-  spawnRate: 10
-  duration: 300
-```
-
-Access in templates:
-```yaml
-{{- if eq .Values.benchmarkTool "guidellm" }}
---rate={{ .Values.guidellm.rates }}
-{{- else if eq .Values.benchmarkTool "locust" }}
---users {{ .Values.locust.users }}
-{{- end }}
-```
-
-## Contributing
-
-When contributing a new benchmark tool:
-
-1. Follow the structure above
-2. Include example values file
-3. Add documentation
-4. Test thoroughly
-5. Submit PR with:
-   - Templates
-   - Examples
-   - Documentation updates
-   - Test results
-
-For questions or help, open an issue in the repository.
