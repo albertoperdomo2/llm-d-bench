@@ -45,6 +45,36 @@ spec:
             echo "[JOB] Logging into Hugging Face..."
             hf auth login --token $HF_CLI_TOKEN
 
+            echo "[JOB] Command: guidellm benchmark run \
+              {{- if .Values.benchmark.target }}
+              --target {{ .Values.benchmark.target }} \
+              {{- end }}
+              {{- if .Values.benchmark.model }}
+              --model {{ .Values.benchmark.model }} \
+              {{- end }}
+              {{- if .Values.benchmark.processor }}
+              --processor {{ .Values.benchmark.processor }} \
+              {{- end }}
+              {{- if .Values.benchmark.backendType }}
+              --backend-type {{ .Values.benchmark.backendType }} \
+              {{- end }}
+              {{- if .Values.benchmark.rateType }}
+              --rate-type={{ .Values.benchmark.rateType }} \
+              {{- end }}
+              {{- if .Values.benchmark.rate }}
+              --rate={{ .Values.benchmark.rate }} \
+              {{- end }}
+              {{- if .Values.benchmark.data }}
+              --data={{ .Values.benchmark.data }} \
+              {{- end }}
+              {{- if .Values.benchmark.maxSeconds }}
+              --max-seconds={{ .Values.benchmark.maxSeconds }} \
+              {{- end }}
+              {{- if .Values.benchmark.additionalArgs }}
+              {{ .Values.benchmark.additionalArgs }} \
+              {{- end }}
+              --output-path \${RUN_DIR}/output.json"
+
             echo "[JOB] Running guidellm..."
             guidellm benchmark run \
               {{- if .Values.benchmark.target }}
