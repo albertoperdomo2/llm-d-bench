@@ -1,6 +1,6 @@
-# LLM Distributed Benchmark (llm-d-bench)
+# llm-d-bench
 
-Helm chart for benchmarking LLM inference endpoints on OpenShift using GuideLLM.
+Helm chart for benchmarking `llm-d` inference endpoints on OpenShift using GuideLLM.
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ Key parameters in `values.yaml`:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `jobType` | `benchmark` or `cleanup` | `benchmark` |
-| `benchmark.target` | Target LLM endpoint | - |
+| `benchmark.target` | Target llm-d endpoint | - |
 | `benchmark.model` | Model name | - |
 | `benchmark.rate` | Concurrent rates (e.g., `{1,50,100}` with --set) | - |
 | `benchmark.data` | Number of requests or token specs (e.g., `{prompt_tokens=1000,output_tokens=1000}` with --set) | `1000` |
