@@ -5,17 +5,16 @@ IFS=$'\n\t'
 PVC_NAME="guidellm-pvc"
 NAMESPACE="llm-d-inference-scheduler"
 PVC_MOUNT_PATH="/results"
+LOCAL_DIR="/results"
 
 if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <local-dir> <remote-dir> <file1> [file2] [file3] ..."
-    echo "Example: $0 ./results_dir run_1760514146 file1.txt file2.log /path/dir/*"
+    echo "Usage: $0 <remote-dir> <file1> [file2] [file3] ..."
+    echo "Example: $0 run_1760514146 file1.txt file2.log /path/dir/*"
     exit 1
 fi
 
 trap 'echo "Cleaning up..."; oc delete pod pvc-copy-pod -n $NAMESPACE --ignore-not-found=true 2>/dev/null || true' EXIT INT TERM
 
-LOCAL_DIR="$1"
-shift
 REMOTE_DIR="$1"
 shift
 FILES=("$@")
