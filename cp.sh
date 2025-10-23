@@ -32,7 +32,7 @@ metadata:
 spec:
   containers:
   - name: copier
-    image: busybox
+    image: instrumentisto/rsync-ssh:latest
     command: ["sleep", "3600"]
     volumeMounts:
     - name: pvc-storage
@@ -51,7 +51,7 @@ echo "Copying files..."
 for file in "${FILES[@]}"; do
     for attempt in {1..3}; do
         echo "  Copying: $file (attempt: $attempt/3)"
-        if oc cp $NAMESPACE/pvc-copy-pod:$PVC_MOUNT_PATH/$REMOTE_DIR/$file "$LOCAL_DIR/$REMOTE_DIR/$(basename $file)" -c copier; then
+        if rsync --rsh='oc rsh' --append pvc-copy-pod:$PVC_MOUNT_PATH/$REMOTE_DIR/$file "$LOCAL_DIR/$REMOTE_DIR"; then
             break
         fi
         sleep 5
