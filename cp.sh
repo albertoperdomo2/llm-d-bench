@@ -7,17 +7,15 @@ NAMESPACE="llm-d-inference-scheduler"
 PVC_MOUNT_PATH="/results"
 LOCAL_DIR="./results"
 
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <remote-dir> <file1> [file2] [file3] ..."
-    echo "Example: $0 run_1760514146 file1.txt file2.log /path/dir/*"
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <remote-dir>"
+    echo "Example: $0 run_1760514146"
     exit 1
 fi
 
 trap 'echo "Cleaning up..."; oc delete pod pvc-copy-pod -n $NAMESPACE --ignore-not-found=true 2>/dev/null || true' EXIT INT TERM
 
 REMOTE_DIR="$1"
-shift
-FILES=("$@")
 
 mkdir -p "$LOCAL_DIR"
 
@@ -47,15 +45,17 @@ EOF
 echo "Waiting for pod to be ready..."
 oc wait --for=condition=Ready pod/pvc-copy-pod -n $NAMESPACE --timeout=180s
 
-echo "Copying files..."
-for file in "${FILES[@]}"; do
-    for attempt in {1..3}; do
-        echo "  Copying: $file (attempt: $attempt/3)"
-        if rsync --rsh='oc rsh' --append pvc-copy-pod:$PVC_MOUNT_PATH/$REMOTE_DIR/$file "$LOCAL_DIR/$REMOTE_DIR"; then
-            break
-        fi
-        sleep 5
-    done
+echo "Syncing directory: $REMOTE_DIR"
+mkdir -p "$LOCAL_DIR/$REMOTE_DIR"
+
+for attempt in {1..3}; do
+    echo "  Syncing directory (attempt: $attempt/3)"
+    if rsync -avz --rsh='oc rsh' pvc-copy-pod:$PVC_MOUNT_PATH/$REMOTE_DIR/ "$LOCAL_DIR/$REMOTE_DIR/"; then
+        echo "Sync completed successfully!"
+        break
+    fi
+    echo "  Sync failed, retrying in 5 seconds..."
+    sleep 5
 done
 
-echo "Done! Files copied to $LOCAL_DIR"
+echo "Done! Directory synced to $LOCAL_DIR/$REMOTE_DIR"
