@@ -106,6 +106,8 @@ spec:
               {{- end }}
               --output-path ${RUN_DIR}/output.json
 
+            echo "[JOB] Output file checksum:"
+            sha256sum "${RUN_DIR}/output.json" || echo "[JOB] Error: Failed to generate checksum"
             echo "[JOB] Results saved to ${RUN_DIR}"
         volumeMounts:
         - name: results
