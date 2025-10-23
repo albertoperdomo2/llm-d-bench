@@ -70,6 +70,9 @@ cleanup:
           - key: nvidia.com/gpu.present
             operator: DoesNotExist
 
+# Log pod matching label for collecting logs from model serving pods
+logPodMatchingLabel: "llm-d.ai/model=ms-inference-scheduling-llm-d-modelservice"
+
 # PVC configuration
 pvc:
   # Create the PVC (set to true if PVC doesn't exist yet)

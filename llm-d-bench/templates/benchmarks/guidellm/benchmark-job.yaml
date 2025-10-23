@@ -109,6 +109,12 @@ spec:
             echo "[JOB] Output file checksum:"
             sha256sum "${RUN_DIR}/output.json" || echo "[JOB] Error: Failed to generate checksum"
             echo "[JOB] Results saved to ${RUN_DIR}"
+
+            echo "[JOB] Saving pod logs..."
+            for POD in $(oc get pods -n {{ .Values.namespace }} -l {{ .Values.logPodMatchingLabel }} -o name | cut -d'/' -f2); do
+              echo "[JOB] Collecting logs from pod: ${POD}"
+              oc logs ${POD} -n {{ .Values.namespace }} >> ${RUN_DIR}/${POD}.log 2>&1 || echo "[JOB] Warning: Failed to collect logs from ${POD}"
+            done
         volumeMounts:
         - name: results
           mountPath: /results

@@ -24,6 +24,9 @@ benchmark:
     GUIDELLM__REQUEST_TIMEOUT: "1000"
     GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL: "INFO"
 
+# Log pod matching label for collecting logs from model serving pods
+logPodMatchingLabel: "llm-d.ai/model=ms-inference-scheduling-llm-d-modelservice"
+
 # PVC configuration
 # Set create: true only for the first experiment run, then set to false to reuse
 pvc:
