@@ -7,7 +7,7 @@ benchmark:
   name: redhatai-qwen3-235b-a22b-fp8-dynamic
 
   # Target inference endpoint
-  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduler.svc.cluster.local:80
+  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduling.svc.cluster.local:80
 
   # Model configuration
   model: RedHatAI/Qwen3-235B-A22B-FP8-dynamic

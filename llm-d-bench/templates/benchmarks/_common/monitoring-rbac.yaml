@@ -1,0 +1,106 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.rbac.enabled }}
+# NOTE: This file sets up the required Prometheus monitoring infrastructure to expose
+# vLLM metrics from inference service pods to the cluster Prometheus/Thanos stack.
+#
+# These resources are REQUIRED for the monitoring sidecar to work:
+# 1. Service: Exposes vLLM metrics endpoint (port 8000) from inference pods
+# 2. ServiceMonitor: Instructs Prometheus to scrape vLLM metrics from the Service
+# 3. RBAC: Grants Prometheus permission to discover and scrape pods in this namespace
+# 4. ConfigMap: Enables user workload monitoring in OpenShift cluster monitoring
+# 5. ServiceAccount: Allows benchmark pod to query Thanos for metrics
+# 6. ClusterRole/ClusterRoleBinding: Grants benchmark pod permission to access Thanos
+#
+# The monitoring sidecar queries Thanos for these scraped metrics, so this setup is
+# a prerequisite for the benchmark monitoring to collect vLLM metrics.
+#
+# If your vLLM inference service pods use different labels, update the selectors below.
+---
+# ServiceAccount for benchmark pod to access Thanos
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.benchmark.name | replace "." "-" }}-sa
+  namespace: {{ .Values.namespace }}
+---
+# ClusterRoleBinding to grant the ServiceAccount access to view cluster monitoring metrics
+# Uses the built-in OpenShift cluster-monitoring-view ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.benchmark.name | replace "." "-" }}-cluster-monitoring-view
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.benchmark.name | replace "." "-" }}-sa
+  namespace: {{ .Values.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: cluster-monitoring-view
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.benchmark.name | replace "." "-" }}-metrics-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    llm-d.ai/role: decode
+spec:
+  selector:
+    llm-d.ai/role: decode
+  ports:
+  - name: metrics
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.benchmark.name | replace "." "-" }}-metrics-servicemonitor
+  namespace: {{ .Values.namespace }}
+  labels:
+    llm-d.ai/role: decode
+spec:
+  selector:
+    matchLabels:
+      llm-d.ai/role: decode
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+    scheme: http
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Values.namespace }}
+  name: prometheus-k8s
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: {{ .Values.namespace }}
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+roleRef:
+  kind: Role
+  name: prometheus-k8s
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    enableUserWorkload: true
+{{- end }}

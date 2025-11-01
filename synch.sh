@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 PVC_NAME="guidellm-pvc"
-NAMESPACE="llm-d-inference-scheduler"
+NAMESPACE="llm-d-inference-scheduling"
 PVC_MOUNT_PATH="/results"
 LOCAL_DIR="./results"
 

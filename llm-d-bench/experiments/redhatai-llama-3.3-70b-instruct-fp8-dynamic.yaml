@@ -7,7 +7,7 @@ benchmark:
   name: redhatai-llama-3.3-70b-instruct-fp8-dynamic
 
   # Target inference endpoint
-  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduler.svc.cluster.local:80
+  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduling.svc.cluster.local:80
 
   # Model configuration
   model: RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic

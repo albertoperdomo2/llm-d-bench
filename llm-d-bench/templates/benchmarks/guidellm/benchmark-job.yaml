@@ -21,7 +21,22 @@ spec:
         app: llm-d-bench
         job: {{ .Values.benchmark.name }}
     spec:
+      {{- if .Values.monitoring.enabled }}
+      serviceAccountName: {{ .Values.benchmark.name | replace "." "-" }}-sa
+      {{- end }}
+      {{- if .Values.monitoring.enabled }}
+      # Shared emptyDir for container coordination
+      initContainers:
+      - name: init-coordination
+        image: busybox:latest
+        command: ['sh', '-c', 'mkdir -p /shared/state && echo "Coordination directory initialized"']
+        volumeMounts:
+        - name: shared-state
+          mountPath: /shared/state
+      {{- end }}
+
       containers:
+      # Main benchmark container
       - name: guidellm
         image: "{{ .Values.benchmark.image.repository }}:{{ .Values.benchmark.image.tag }}"
         env:
@@ -42,16 +57,20 @@ spec:
 
             export RUN_DIR="/results/run_$(date +%s)"
             mkdir -p ${RUN_DIR}
+            {{- if .Values.monitoring.enabled }}
+            mkdir -p ${RUN_DIR}/metrics
+            export STATE_DIR="/shared/state"
+            {{- end }}
             export GUIDELLM__LOGGING__LOG_FILE="${RUN_DIR}/console.log"
 
-            echo "[JOB] Creating cache directory..."
+            echo "[BENCHMARK] Creating cache directory..."
             mkdir -p /results/.huggingface
             export HF_HOME="/results/.huggingface"
 
-            echo "[JOB] Logging into Hugging Face..."
+            echo "[BENCHMARK] Logging into Hugging Face..."
             hf auth login --token $HF_CLI_TOKEN
 
-            echo "[JOB] Command: guidellm benchmark run \
+            echo "[BENCHMARK] Command: guidellm benchmark run \
               {{- if .Values.benchmark.target }}
               --target {{ .Values.benchmark.target }} \
               {{- end }}
@@ -81,7 +100,16 @@ spec:
               {{- end }}
               --output-path \${RUN_DIR}/output.json"
 
-            echo "[JOB] Running guidellm..."
+            {{- if .Values.monitoring.enabled }}
+            # Signal monitoring sidecar to start collection
+            echo "[BENCHMARK] Signaling monitoring sidecar to start..."
+            touch ${STATE_DIR}/.start_collection
+
+            # Wait briefly for monitoring to initialize
+            sleep 2
+            {{- end }}
+
+            echo "[BENCHMARK] Running guidellm..."
             guidellm benchmark run \
               {{- if .Values.benchmark.target }}
               --target {{ .Values.benchmark.target }} \
@@ -112,9 +140,26 @@ spec:
               {{- end }}
               --output-path ${RUN_DIR}/output.json
 
-            echo "[JOB] Output file checksum:"
-            sha256sum "${RUN_DIR}/output.json" || echo "[JOB] Error: Failed to generate checksum"
-            echo "[JOB] Results saved to ${RUN_DIR}"
+            echo "[BENCHMARK] Output file checksum:"
+            sha256sum "${RUN_DIR}/output.json" || echo "[BENCHMARK] Error: Failed to generate checksum"
+
+            {{- if .Values.monitoring.enabled }}
+            # Signal monitoring sidecar to stop collection
+            echo "[BENCHMARK] Signaling monitoring sidecar to stop..."
+            touch ${STATE_DIR}/.stop_collection
+
+            # Wait for monitoring to complete (max 60 seconds)
+            echo "[BENCHMARK] Waiting for monitoring to complete..."
+            for i in {1..60}; do
+              if [ ! -f "${STATE_DIR}/.healthy" ]; then
+                echo "[BENCHMARK] Monitoring sidecar completed"
+                break
+              fi
+              sleep 1
+            done
+            {{- end }}
+
+            echo "[BENCHMARK] Results saved to ${RUN_DIR}"
 
             # Create a marker file to signal the s3-uploader to start
             echo "${RUN_DIR}" > /results/upload-marker
@@ -128,6 +173,10 @@ spec:
         volumeMounts:
         - name: results
           mountPath: /results
+        {{- if .Values.monitoring.enabled }}
+        - name: shared-state
+          mountPath: /shared/state
+        {{- end }}
         resources:
           requests:
             memory: "2Gi"
@@ -192,10 +241,74 @@ spec:
             memory: "4Gi"
             cpu: "1000m"
       {{- end }}
+
+      {{- if .Values.monitoring.enabled }}
+      # Monitoring sidecar container
+      - name: monitoring
+        image: "{{ .Values.monitoring.sidecar.image.repository }}:{{ .Values.monitoring.sidecar.image.tag }}"
+        env:
+          - name: THANOS_URL
+            value: {{ .Values.monitoring.thanosUrl | quote }}
+          - name: RESULTS_BASE_DIR
+            value: "/results"
+          - name: COLLECTION_INTERVAL
+            value: {{ .Values.monitoring.collectionInterval | quote }}
+          {{- if .Values.monitoring.metrics }}
+          - name: METRICS
+            value: {{ join "," .Values.monitoring.metrics | quote }}
+          {{- end }}
+          {{- if .Values.monitoring.labels }}
+          - name: LABELS
+            value: {{ .Values.monitoring.labels | quote }}
+          {{- end }}
+          - name: COLLECT_NODE_METRICS
+            value: {{ .Values.monitoring.collectNodeMetrics | quote }}
+          - name: LOG_LEVEL
+            value: {{ .Values.monitoring.logLevel | quote }}
+        volumeMounts:
+        - name: results
+          mountPath: /results
+        - name: shared-state
+          mountPath: /tmp/monitoring
+        resources:
+          requests:
+            memory: {{ .Values.monitoring.sidecar.resources.requests.memory | quote }}
+            cpu: {{ .Values.monitoring.sidecar.resources.requests.cpu | quote }}
+          limits:
+            memory: {{ .Values.monitoring.sidecar.resources.limits.memory | quote }}
+            cpu: {{ .Values.monitoring.sidecar.resources.limits.cpu | quote }}
+        # Liveness probe to ensure monitoring is responsive
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - "[ -f /tmp/monitoring/.healthy ]"
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        # Readiness probe to track when monitoring is ready
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - "[ -f /tmp/monitoring/.healthy ]"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      {{- end }}
+
       volumes:
       - name: results
         persistentVolumeClaim:
           claimName: {{ .Values.pvc.name }}
+      {{- if .Values.monitoring.enabled }}
+      - name: shared-state
+        emptyDir: {}
+      {{- end }}
       restartPolicy: Never
       {{- if .Values.benchmark.nodeSelector }}
       nodeSelector:

@@ -1,7 +1,7 @@
 # llm-d-bench Helm Chart Values
 
 # Namespace to deploy to
-namespace: llm-d-inference-scheduler
+namespace: llm-d-inference-scheduling
 
 # Benchmark tool to use (guidellm, or add more in the future)
 benchmarkTool: guidellm
@@ -16,7 +16,7 @@ benchmark:
 
   # Image
   image:
-    repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduler/guidellm-runner"
+    repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduling/guidellm-runner"
     tag: "latest"
 
   # Environment variables for the benchmark container
@@ -44,13 +44,13 @@ benchmark:
   # nodeSelector:
   #   node.kubernetes.io/instance-type: worker
 
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: nvidia.com/gpu.present
-            operator: DoesNotExist
+  # affinity:
+  #   nodeAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       nodeSelectorTerms:
+  #       - matchExpressions:
+  #         - key: nvidia.com/gpu.present
+  #           operator: DoesNotExist
 
 # Cleanup job configuration
 cleanup:
@@ -62,16 +62,77 @@ cleanup:
   # nodeSelector:
   #   node.kubernetes.io/instance-type: worker
 
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: nvidia.com/gpu.present
-            operator: DoesNotExist
+  # affinity:
+  #   nodeAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       nodeSelectorTerms:
+  #       - matchExpressions:
+  #         - key: nvidia.com/gpu.present
+  #           operator: DoesNotExist
 
 # Log pod matching label for collecting logs from model serving pods
 logPodMatchingLabel: "llm-d.ai/model=ms-inference-scheduling-llm-d-modelservice"
+
+# Monitoring configuration
+monitoring:
+  # Enable metrics collection during benchmark
+  # When enabled, deploys a dedicated monitoring sidecar container
+  enabled: false
+
+  # RBAC and infrastructure setup for monitoring
+  # Set to false if your cluster already has the necessary RBAC, ServiceMonitor, etc.
+  rbac:
+    enabled: true
+
+  # Monitoring sidecar container configuration
+  sidecar:
+    image:
+      repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduling/vllm-metrics-collector"
+      tag: "latest"
+
+    # Resource allocation for monitoring sidecar
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  # Thanos Querier endpoint for vLLM metrics collection
+  thanosUrl: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+
+  # Collection interval in seconds
+  collectionInterval: 10
+
+  # Specific vLLM metrics to collect (leave empty to use defaults)
+  # Default metrics are listed below. You can override by providing a custom list.
+  # Full list: https://docs.vllm.ai/en/latest/design/metrics.html
+  metrics:
+    - "vllm:num_requests_running"
+    - "vllm:num_requests_waiting"
+    - "vllm:num_requests_swapped"
+    - "vllm:gpu_cache_usage_perc"
+    - "vllm:cpu_cache_usage_perc"
+    - "vllm:avg_prompt_throughput_toks_per_s"
+    - "vllm:avg_generation_throughput_toks_per_s"
+    - "vllm:time_to_first_token_seconds"
+    - "vllm:time_per_output_token_seconds"
+    - "vllm:e2e_request_latency_seconds"
+    - "vllm:num_preemptions_total"
+    - "vllm:prompt_tokens_total"
+    - "vllm:generation_tokens_total"
+
+  # Label filters for vLLM metrics (e.g., model=llama)
+  # Format: key1=value1,key2=value2
+  labels: ""
+
+  # Collect node-level metrics (CPU, memory, network, disk I/O)
+  # Set to false to only collect vLLM metrics
+  collectNodeMetrics: true
+
+  # Log level for monitoring script (DEBUG, INFO, WARNING, ERROR)
+  logLevel: "INFO"
 
 # PVC configuration
 pvc:

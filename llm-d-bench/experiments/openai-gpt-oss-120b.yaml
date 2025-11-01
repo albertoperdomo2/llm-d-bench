@@ -7,7 +7,7 @@ benchmark:
   name: openai-gpt-oss-120b 
 
   # Target inference endpoint
-  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduler.svc.cluster.local:80
+  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduling.svc.cluster.local:80
 
   # Model configuration
   model: openai/gpt-oss-120b

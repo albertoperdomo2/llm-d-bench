@@ -109,6 +109,100 @@
     "logPodMatchingLabel": {
       "type": "string"
     },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable metrics collection during benchmark (runs in background)"
+        },
+        "rbac": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable RBAC and monitoring infrastructure setup (Service, ServiceMonitor, Role, RoleBinding, ConfigMap)"
+            }
+          }
+        },
+        "sidecar": {
+          "type": "object",
+          "description": "Monitoring sidecar container configuration",
+          "properties": {
+            "image": {
+              "type": "object",
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "description": "Container image repository"
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "Container image tag"
+                }
+              }
+            },
+            "resources": {
+              "type": "object",
+              "properties": {
+                "requests": {
+                  "type": "object",
+                  "properties": {
+                    "memory": {
+                      "type": "string"
+                    },
+                    "cpu": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "memory": {
+                      "type": "string"
+                    },
+                    "cpu": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "thanosUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Thanos Querier endpoint URL for vLLM metrics"
+        },
+        "collectionInterval": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Metrics collection interval in seconds"
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of specific vLLM metrics to collect (uses defaults if empty)"
+        },
+        "labels": {
+          "type": "string",
+          "description": "Label filters for vLLM metrics (key1=value1,key2=value2)"
+        },
+        "collectNodeMetrics": {
+          "type": "boolean",
+          "description": "Collect node-level metrics (CPU, memory, network, disk I/O)"
+        },
+        "logLevel": {
+          "type": "string",
+          "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+          "description": "Log level for monitoring script"
+        }
+      }
+    },
     "pvc": {
       "type": "object",
       "properties": {

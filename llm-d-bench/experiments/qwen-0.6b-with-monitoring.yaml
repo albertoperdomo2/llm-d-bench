@@ -1,0 +1,71 @@
+# Qwen 0.6B Benchmark with Monitoring Enabled
+# Demonstrates vLLM metrics collection during benchmark execution
+
+jobType: benchmark
+
+benchmark:
+  name: qwen-0-6b-monitored
+
+  # Target inference endpoint
+  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduling.svc.cluster.local:80
+
+  # Model configuration
+  model: Qwen/Qwen3-0.6B
+  processor: Qwen/Qwen3-0.6B
+
+  # Benchmark parameters
+  rateType: concurrent
+  rate: "20"
+  data: "prompt_tokens=512,output_tokens=512"
+  maxSeconds: "600"
+
+  # Environment variables (optional)
+  env:
+    GUIDELLM__REQUEST_TIMEOUT: "1000"
+    GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL: "INFO"
+
+# Enable comprehensive monitoring (vLLM + node metrics)
+monitoring:
+  enabled: true
+
+  # Thanos Querier endpoint (adjust if different in your cluster)
+  thanosUrl: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+
+  # Collect metrics every 10 seconds
+  collectionInterval: 10
+
+  # Collect node-level metrics (CPU, memory, network, disk I/O)
+  collectNodeMetrics: true
+
+  # Use default vLLM metrics (leave empty to use all defaults from values.yaml)
+  # Or specify a subset of custom metrics here
+  metrics:
+    - "vllm:e2e_request_latency_seconds_bucket"
+    - "vllm:inter_token_latency_seconds_bucket"
+    - "vllm:kv_cache_usage_perc"
+    - "vllm:num_requests_running"
+    - "vllm:num_requests_waiting"
+    - "vllm:request_prefill_time_seconds_bucket"
+    - "vllm:request_prompt_tokens_bucket"
+    - "vllm:request_queue_time_seconds_bucket"
+    - "vllm:request_success_created"
+    - "vllm:request_success_total"
+    - "vllm:request_time_per_output_token_seconds_bucket"
+    - "vllm:time_per_output_token_seconds_bucket"
+    - "vllm:time_to_first_token_seconds_bucket"
+
+  # Optional: Filter vLLM metrics by labels
+  # labels: "model=Qwen/Qwen3-0.6B"
+
+  # Log level for monitoring
+  logLevel: "INFO"
+
+# Log pod matching label for collecting logs from model serving pods
+logPodMatchingLabel: "llm-d.ai/model=ms-inference-scheduling-llm-d-modelservice"
+
+# PVC configuration
+# Set create: true only for the first experiment run, then set to false to reuse
+pvc:
+  create: false
+  name: guidellm-pvc
+  size: "20Gi"
