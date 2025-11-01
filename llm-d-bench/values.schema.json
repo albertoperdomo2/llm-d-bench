@@ -2,18 +2,17 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "global": {
-      "type": "object",
-      "properties": {
-        "namespace": {
-          "type": "string",
-          "description": "Namespace to deploy resources"
-        }
-      }
+    "namespace": {
+      "type": "string",
+      "description": "Namespace to deploy resources"
+    },
+    "benchmarkTool": {
+      "type": "string",
+      "description": "Benchmark tool to use"
     },
     "jobType": {
       "type": "string",
-      "enum": ["benchmark", "cleanup", "none"],
+      "enum": ["benchmark", "cleanup", "pvc", "none"],
       "description": "Type of job to deploy"
     },
     "benchmark": {
@@ -23,18 +22,6 @@
           "type": "string",
           "description": "Job name"
         },
-        "targetUrl": {
-          "type": "string",
-          "description": "Target URL for the benchmark"
-        },
-        "modelName": {
-          "type": "string",
-          "description": "Model name"
-        },
-        "dataProfile": {
-          "type": "string",
-          "description": "Data profile"
-        },
         "image": {
           "type": "object",
           "properties": {
@@ -43,44 +30,64 @@
             },
             "tag": {
               "type": "string"
-            },
-            "pullPolicy": {
-              "type": "string",
-              "enum": ["Always", "IfNotPresent", "Never"]
             }
           }
         },
-        "resources": {
-          "type": "object",
-          "properties": {
-            "requests": {
-              "type": "object",
-              "properties": {
-                "memory": {
-                  "type": "string"
-                },
-                "cpu": {
-                  "type": "string"
-                }
-              }
+        "env": {
+          "type": "object"
+        },
+        "target": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "processor": {
+          "type": "string"
+        },
+        "backendType": {
+          "type": "string"
+        },
+        "rateType": {
+          "type": "string"
+        },
+        "rate": {
+          "oneOf": [
+            {
+              "type": "string"
             },
-            "limits": {
-              "type": "object",
-              "properties": {
-                "memory": {
-                  "type": "string"
-                },
-                "cpu": {
-                  "type": "string"
-                }
+            {
+              "type": "array",
+              "items": {
+                "type": "integer"
               }
             }
-          }
+          ]
         },
-        "backoffLimit": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Number of retries before marking job as failed"
+        "data": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "maxSeconds": {
+          "type": "string"
+        },
+        "additionalArgs": {
+          "type": "string"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "affinity": {
+          "type": "object"
         }
       }
     },
@@ -91,11 +98,16 @@
           "type": "string",
           "description": "Cleanup job name"
         },
-        "serviceAccountName": {
-          "type": "string",
-          "description": "Service account for cleanup job"
+        "nodeSelector": {
+          "type": "object"
+        },
+        "affinity": {
+          "type": "object"
         }
       }
+    },
+    "logPodMatchingLabel": {
+      "type": "string"
     },
     "pvc": {
       "type": "object",
@@ -108,35 +120,43 @@
           "type": "string",
           "description": "PVC name"
         },
-        "storageClassName": {
-          "type": "string",
-          "description": "Storage class name"
-        },
-        "accessModes": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"]
-          }
-        },
         "size": {
           "type": "string",
           "pattern": "^[0-9]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
           "description": "Storage size"
-        },
-        "mountPath": {
-          "type": "string",
-          "description": "Mount path in containers"
         }
       }
     },
-    "labels": {
+    "kueue": {
       "type": "object",
-      "description": "Additional labels to apply to all resources"
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "queueName": {
+          "type": "string"
+        }
+      }
     },
-    "annotations": {
+    "s3": {
       "type": "object",
-      "description": "Additional annotations to apply to all resources"
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "secretName": {
+          "type": "string"
+        }
+      }
     }
   }
 }

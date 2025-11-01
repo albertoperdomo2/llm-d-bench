@@ -84,3 +84,29 @@ pvc:
 
   # PVC size (only applies if create: true)
   size: 50Gi
+
+# Kueue batching configuration
+kueue:
+  # Enable Kueue batching
+  enabled: false
+  # Kueue queue name
+  queueName: "guidellm-jobs"
+
+# S3 configuration
+s3:
+  # Enable S3 upload
+  enabled: false
+
+  # S3 bucket name
+  bucket: ""
+
+  # S3 endpoint URL
+  endpoint: ""
+
+  # S3 region
+  region: ""
+
+  # Secret containing S3 credentials
+  # The secret must have keys: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+  secretName: "aws-credentials"
+

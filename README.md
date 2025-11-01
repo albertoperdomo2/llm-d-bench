@@ -10,6 +10,12 @@ oc create secret generic huggingface-token \
   --from-literal=HF_CLI_TOKEN=your-token \
   -n keda
 
+# Create AWS credentials secret for S3 upload (optional)
+oc create secret generic aws-credentials \
+  --from-literal=AWS_ACCESS_KEY_ID=your-access-key \
+  --from-literal=AWS_SECRET_ACCESS_KEY=your-secret-key \
+  -n keda
+
 # Run benchmark
 helm install my-benchmark ./llm-d-bench \
   --set benchmark.target=http://llm-service:8080 \
@@ -37,6 +43,13 @@ Key parameters in `values.yaml`:
 | `benchmark.affinity` | Node affinity rules (excludes GPU nodes) | See values.yaml |
 | `pvc.create` | Create PVC for results (set to false to reuse existing) | `false` |
 | `pvc.size` | Storage size | `50Gi` |
+| `s3.enabled` | Enable S3 upload of results | `false` |
+| `s3.bucket` | S3 bucket name | - |
+| `s3.endpoint` | S3 endpoint URL | - |
+| `s3.region` | S3 region | - |
+| `s3.secretName` | Name of the secret with AWS credentials | `aws-credentials` |
+| `kueue.enabled` | Enable Kueue batching | `false` |
+| `kueue.queueName` | Kueue queue name | `guidellm-jobs` |
 
 ## Usage
 
@@ -81,6 +94,28 @@ helm install my-test ./llm-d-bench \
   --set 'benchmark.data={prompt_tokens=1000,output_tokens=1000}' \
   -n keda
 ```
+
+### S3 Upload and Kueue Integration
+```bash
+# Run benchmark with S3 upload enabled
+helm install my-benchmark ./llm-d-bench \
+  --set benchmark.target=http://llm-service:8080 \
+  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
+  --set s3.enabled=true \
+  --set s3.bucket=my-results-bucket \
+  --set s3.endpoint=https://s3.my-region.amazonaws.com \
+  --set s3.region=my-region \
+  -n keda
+
+# Run benchmark with Kueue batching enabled
+helm install my-batch-job ./llm-d-bench \
+  --set benchmark.target=http://llm-service:8080 \
+  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
+  --set kueue.enabled=true \
+  --set kueue.queueName=my-custom-queue \
+  -n keda
+```
+
 
 **Note:** When using `--set` with comma-separated values, wrap them in curly braces `{value1,value2}` so Helm handles them correctly.
 
