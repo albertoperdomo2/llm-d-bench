@@ -160,10 +160,12 @@ spec:
 
             echo "[JOB] S3 uploader started, waiting for benchmark to complete..."
 
+            SECONDS=0
             while [ ! -f "${DONE_FILE_PATH}" ]; do
-              echo "[JOB] Waiting for benchmark completion marker..."
-              sleep 10
+              echo -ne "[JOB] Waiting for benchmark completion marker (${SECONDS}s)\r"
+              sleep 1
             done
+            echo ""
 
             RUN_DIR=$(cat "${DONE_FILE_PATH}")
             OUTPUT_FILE="${RUN_DIR}/output.json"
@@ -171,7 +173,7 @@ spec:
             if [ -f "${OUTPUT_FILE}" ]; then
               echo "[JOB] Benchmark complete. Uploading results to S3 from ${OUTPUT_FILE}..."
               # Try to upload, but do not exit on error
-              aws s3 cp "${OUTPUT_FILE}" "s3://{{ .Values.s3.bucket }}/$(basename ${RUN_DIR})/output.json" --endpoint-url {{ .Values.s3.endpoint }} --region {{ .Values.s3.region }} || \
+              aws s3 cp "${OUTPUT_FILE}" "s3://{{ .Values.s3.bucket }}/llm-d-bench/$(basename ${RUN_DIR})/output.json" --region {{ .Values.s3.region }} || \
                 echo "[JOB] Error: S3 upload failed. The job will still complete."
               echo "[JOB] Results successfully uploaded to S3 bucket: {{ .Values.s3.bucket }}"
             else
