@@ -1,7 +1,6 @@
 # Example: Create only the PVC
 
 namespace: keda
-jobType: none  # Won't match any job template
 
 pvc:
   create: true

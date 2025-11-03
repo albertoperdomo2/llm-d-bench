@@ -71,10 +71,3 @@ Benchmark job name
 {{- define "llm-d-bench.benchmarkJobName" -}}
 {{- .Values.benchmark.name | default (printf "%s-benchmark" (include "llm-d-bench.fullname" .)) }}
 {{- end }}
-
-{{/*
-Cleanup job name
-*/}}
-{{- define "llm-d-bench.cleanupJobName" -}}
-{{- .Values.cleanup.name | default (printf "%s-cleanup" (include "llm-d-bench.fullname" .)) }}
-{{- end }}

@@ -1,8 +1,6 @@
 # RedHatAI Llama-3.3-70B Instruct FP8 dynamic Baseline Benchmark Experiment
 # Tests basic performance with simple token specifications
 
-jobType: benchmark
-
 benchmark:
   name: redhatai-llama-4-maverick-17b-128e-instruct-fp8
 
@@ -33,3 +31,16 @@ pvc:
   create: false
   name: guidellm-pvc
   size: "20Gi"
+
+# Kueue configuration
+kueue:
+  enabled: true
+  queueName: "guidellm-jobs"
+
+# S3 configuration
+s3:
+  enabled: true
+  bucket: ""
+  endpoint: ""
+  region: "us-east-1"
+  secretName: "aws-credentials"

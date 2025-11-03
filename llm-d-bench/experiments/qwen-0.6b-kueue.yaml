@@ -3,13 +3,11 @@
 
 namespace: llm-d-inference-scheduling
 
-jobType: benchmark
-
 benchmark:
   name: qwen-0.6b-kueue
 
   image:
-    repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduling/guidellm-runner"
+    repository: "ghcr.io/vllm-project/guidellm"
     tag: "latest"
 
   affinity: null

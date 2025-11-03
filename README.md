@@ -33,7 +33,6 @@ Key parameters in `values.yaml`:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `jobType` | `benchmark` or `cleanup` | `benchmark` |
 | `benchmark.target` | Target llm-d endpoint | - |
 | `benchmark.model` | Model name | - |
 | `benchmark.rate` | Concurrent rates (e.g., `{1,50,100}` with --set) | - |
@@ -119,32 +118,26 @@ helm install my-batch-job ./llm-d-bench \
 
 **Note:** When using `--set` with comma-separated values, wrap them in curly braces `{value1,value2}` so Helm handles them correctly.
 
-### Cleanup results
-```bash
-helm install cleanup ./llm-d-bench -f examples/cleanup-example.yaml -n keda
-```
-
 ## Results
 
 Results are stored in the PVC under `/results/run_<timestamp>/`:
 - `console.log` - Execution logs
 - `output.json` - Benchmark results
 
-Access results:
+If S3 upload is enabled, results are automatically uploaded to your configured S3 bucket.
+
+### Accessing Results Locally (Optional)
+
+If you need to access results directly from the PVC:
+
 ```bash
 # Browse PVC
 oc run -it --rm pvc-browser --image=busybox \
   --overrides='{"spec":{"containers":[{"name":"pvc-browser","image":"busybox","command":["sh"],"stdin":true,"tty":true,"volumeMounts":[{"name":"data","mountPath":"/results"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"guidellm-pvc"}}]}}' \
   -n keda
-```
 
-## Building Images
-
-### OpenShift BuildConfig
-```bash
-oc apply -f llm-d-bench/build/imagestream.yaml
-oc apply -f llm-d-bench/build/buildconfig.yaml
-oc start-build guidellm-runner --from-dir=. --follow
+# Or use the sync.sh script to copy results to your local machine
+./synch.sh run_<timestamp>
 ```
 
 ## Adding Benchmark Tools
@@ -159,9 +152,10 @@ Pre-configured benchmark experiments are available in `llm-d-bench/experiments/`
 
 Create your own experiment files in this directory for repeatable benchmark scenarios.
 
-## Copy results
-
-Use the `cp.sh` script to copy the benchmark outputs to your local machine. 
+> [!IMPORTANT]
+> Experiment filenames must not contain periods (`.`) except for the `.yaml` extension. Use hyphens (`-`) or underscores (`_`) instead.
+> - Good: `my-experiment-v2.yaml`, `qwen_test.yaml`
+> - Bad: `my.experiment.yaml`, `test-v1.2.yaml`
 
 ## Documentation
 

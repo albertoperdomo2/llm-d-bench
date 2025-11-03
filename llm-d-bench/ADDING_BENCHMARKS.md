@@ -24,7 +24,7 @@ mkdir -p templates/benchmarks/your-tool
 `templates/benchmarks/your-tool/benchmark-job.yaml`:
 
 ```yaml
-{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "your-tool") }}
+{{- if eq .Values.benchmarkTool "your-tool" }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -99,7 +99,6 @@ benchmark:
 
 ```yaml
 benchmarkTool: your-tool
-jobType: benchmark
 
 benchmark:
   name: test
@@ -112,6 +111,11 @@ pvc:
   create: false
   name: llm-d-bench-pvc
 ```
+
+> [!IMPORTANT]
+> When creating experiment files in `experiments/`, the filename must not contain periods (`.`) except for the `.yaml` extension. Use hyphens (`-`) or underscores (`_`) instead.
+> - Good: `my-experiment-v2.yaml`, `benchmark_test.yaml`
+> - Bad: `my.experiment.yaml`, `test-v1.2.yaml`
 
 ### 5. Test
 
@@ -137,7 +141,7 @@ helm install test ./llm-d-bench -f examples/your-tool-example.yaml -n keda
 
 ## Key Points
 
-- Use conditional rendering: `{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "your-tool") }}`
+- Use conditional rendering: `{{- if eq .Values.benchmarkTool "your-tool" }}`
 - Save results to `/results/run_$(date +%s)/`
 - Include nodeSelector and affinity support for scheduling control
 - Add resource limits
@@ -156,33 +160,3 @@ If your tool needs comma-separated parameters (like rates or complex configurati
 This handles both cases:
 - **Values file**: `rate: "1,50,100"` → passes through as string
 - **--set flag**: `--set 'benchmark.rate={1,50,100}'` → Helm converts to array, template joins it back
-
-## Cleanup Job (Optional)
-
-`templates/benchmarks/your-tool/cleanup-job.yaml`:
-
-```yaml
-{{- if and (eq .Values.jobType "cleanup") (eq .Values.benchmarkTool "your-tool") }}
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {{ .Values.cleanup.name }}
-  namespace: {{ .Values.namespace }}
-spec:
-  template:
-    spec:
-      containers:
-      - name: cleanup
-        image: registry.access.redhat.com/ubi9-micro:latest
-        command: ["/bin/bash", "-c", "rm -rf /results/run_*"]
-        volumeMounts:
-        - name: results
-          mountPath: /results
-      volumes:
-      - name: results
-        persistentVolumeClaim:
-          claimName: {{ .Values.pvc.name }}
-      restartPolicy: Never
-{{- end }}
-```

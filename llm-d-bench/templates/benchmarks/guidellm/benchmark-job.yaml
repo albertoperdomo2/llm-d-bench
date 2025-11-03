@@ -1,4 +1,4 @@
-{{- if and (eq .Values.jobType "benchmark") (eq .Values.benchmarkTool "guidellm") }}
+{{- if eq .Values.benchmarkTool "guidellm" }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -116,15 +116,28 @@ spec:
             sha256sum "${RUN_DIR}/output.json" || echo "[JOB] Error: Failed to generate checksum"
             echo "[JOB] Results saved to ${RUN_DIR}"
 
+            {{- if .Values.s3.enabled }}
             # Create a marker file to signal the s3-uploader to start
             echo "${RUN_DIR}" > /results/upload-marker
 
             echo "[JOB] Benchmark script finished. Waiting for S3 upload to complete..."
-            # Wait for the sidecar to remove the marker file
-            while [ -f "/results/upload-marker" ]; do
+            # Wait for the sidecar to remove the marker file (with 5-minute timeout)
+            WAIT_SECONDS=0
+            MAX_WAIT_SECONDS=300
+            while [ -f "/results/upload-marker" ] && [ $WAIT_SECONDS -lt $MAX_WAIT_SECONDS ]; do
               sleep 5
+              WAIT_SECONDS=$((WAIT_SECONDS + 5))
             done
-            echo "[JOB] S3 upload complete. Exiting."
+
+            if [ -f "/results/upload-marker" ]; then
+              echo "[JOB] Warning: S3 upload timed out after ${MAX_WAIT_SECONDS}s. Results remain in PVC."
+              rm -f /results/upload-marker
+            else
+              echo "[JOB] S3 upload complete. Exiting."
+            fi
+            {{- else }}
+            echo "[JOB] Benchmark complete. Results saved locally."
+            {{- end }}
         volumeMounts:
         - name: results
           mountPath: /results
@@ -160,24 +173,44 @@ spec:
 
             echo "[JOB] S3 uploader started, waiting for benchmark to complete..."
 
-            SECONDS=0
-            while [ ! -f "${DONE_FILE_PATH}" ]; do
-              echo -ne "[JOB] Waiting for benchmark completion marker (${SECONDS}s)\r"
-              sleep 1
+            # Wait for marker file with timeout (max 2 hours)
+            WAIT_SECONDS=0
+            MAX_WAIT_SECONDS=7200
+            while [ ! -f "${DONE_FILE_PATH}" ] && [ $WAIT_SECONDS -lt $MAX_WAIT_SECONDS ]; do
+              echo -ne "[JOB] Waiting for benchmark completion marker (${WAIT_SECONDS}s)\r"
+              sleep 5
+              WAIT_SECONDS=$((WAIT_SECONDS + 5))
             done
             echo ""
 
-            RUN_DIR=$(cat "${DONE_FILE_PATH}")
-            OUTPUT_FILE="${RUN_DIR}/output.json"
+            if [ ! -f "${DONE_FILE_PATH}" ]; then
+              echo "[JOB] Error: Benchmark did not complete within ${MAX_WAIT_SECONDS}s. Exiting."
+              exit 1
+            fi
 
-            if [ -f "${OUTPUT_FILE}" ]; then
-              echo "[JOB] Benchmark complete. Uploading results to S3 from ${OUTPUT_FILE}..."
-              # Try to upload, but do not exit on error
-              aws s3 cp "${OUTPUT_FILE}" "s3://{{ .Values.s3.bucket }}/llm-d-bench/$(basename ${RUN_DIR})/output.json" --region {{ .Values.s3.region }} || \
-                echo "[JOB] Error: S3 upload failed. The job will still complete."
-              echo "[JOB] Results successfully uploaded to S3 bucket: {{ .Values.s3.bucket }}"
+            RUN_DIR=$(cat "${DONE_FILE_PATH}")
+            S3_BASE_PATH="s3://{{ .Values.s3.bucket }}/llm-d-bench/$(basename ${RUN_DIR})"
+
+            if [ ! -d "${RUN_DIR}" ]; then
+              echo "[JOB] Error: Run directory not found at ${RUN_DIR}. Skipping upload."
+              exit 0
+            fi
+
+            echo "[JOB] Benchmark complete. Syncing results directory to S3..."
+            echo "[JOB] Source: ${RUN_DIR}"
+            echo "[JOB] Destination: ${S3_BASE_PATH}/"
+
+            # Sync entire run directory to S3
+            if aws s3 sync "${RUN_DIR}" "${S3_BASE_PATH}/" \
+              {{- if .Values.s3.endpoint }}
+              --endpoint-url {{ .Values.s3.endpoint }} \
+              {{- end }}
+              --region {{ .Values.s3.region }}; then
+              echo "[JOB] Results successfully synced to S3 bucket: {{ .Values.s3.bucket }}"
+              echo "[JOB] S3 path: ${S3_BASE_PATH}/"
             else
-              echo "[JOB] Error: Output file not found at ${OUTPUT_FILE}. Skipping upload."
+              echo "[JOB] Error: S3 sync failed. Results remain in PVC only."
+              exit 1
             fi
 
             echo "[JOB] S3 uploader finished."

@@ -2,13 +2,12 @@
 
 namespace: keda
 benchmarkTool: guidellm
-jobType: benchmark
 
 benchmark:
   name: llama-benchmark-test
 
   image:
-    repository: "image_repo"
+    repository: "ghcr.io/vllm-project/guidellm"
     tag: "latest"
 
   env:
@@ -29,3 +28,16 @@ pvc:
   create: true
   name: guidellm-pvc
   size: 50Gi
+
+# Kueue configuration
+kueue:
+  enabled: true
+  queueName: "guidellm-jobs"
+
+# S3 configuration
+s3:
+  enabled: true
+  bucket: ""
+  endpoint: ""
+  region: "us-east-1"
+  secretName: "aws-credentials"

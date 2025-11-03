@@ -10,11 +10,6 @@
       "type": "string",
       "description": "Benchmark tool to use"
     },
-    "jobType": {
-      "type": "string",
-      "enum": ["benchmark", "cleanup", "pvc", "none"],
-      "description": "Type of job to deploy"
-    },
     "benchmark": {
       "type": "object",
       "properties": {
@@ -82,21 +77,6 @@
         },
         "additionalArgs": {
           "type": "string"
-        },
-        "nodeSelector": {
-          "type": "object"
-        },
-        "affinity": {
-          "type": "object"
-        }
-      }
-    },
-    "cleanup": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Cleanup job name"
         },
         "nodeSelector": {
           "type": "object"
