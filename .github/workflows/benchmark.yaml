@@ -89,12 +89,12 @@ jobs:
       - name: Log in to OpenShift
         env:
           OPENSHIFT_SERVER_URL: ${{ secrets.OPENSHIFT_SERVER_URL }}
-	  OPENSHIFT_CA_CERT: ${{ secrets.OPENSHIFT_CA_CERT }}
+          OPENSHIFT_CA_CERT: ${{ secrets.OPENSHIFT_CA_CERT }}
           OIDC_TOKEN: ${{ steps.get_token.outputs.token }}
         run: |
-	  echo "$OPENSHIFT_CA_CERT" > ca.crt
+          echo "$OPENSHIFT_CA_CERT" > ca.crt
           oc login $OPENSHIFT_SERVER_URL --token=$OIDC_TOKEN --certificate-authority=ca.crt
-	  oc config set-context --current --namespace=llm-d-inference-scheduling
+          oc config set-context --current --namespace=llm-d-inference-scheduling
 
       - name: Deploy benchmark job
         id: deploy
