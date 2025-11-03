@@ -238,5 +238,5 @@ spec:
       affinity:
         {{- toYaml .Values.benchmark.affinity | nindent 8 }}
       {{- end }}
-  backoffLimit: 2
+  backoffLimit: 1
 {{- end }}
