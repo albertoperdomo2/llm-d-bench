@@ -94,6 +94,7 @@ jobs:
 
           helm install "$RELEASE_NAME" ./llm-d-bench \
             -f "${{ steps.parse.outputs.experiment_file }}" \
+            --set benchmark.name="$RELEASE_NAME" \
             --set pvc.create=true -n llm-d-inference-scheduling
 
       - name: Wait for job completion
