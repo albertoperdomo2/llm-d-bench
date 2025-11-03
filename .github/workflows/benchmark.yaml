@@ -84,8 +84,8 @@ jobs:
           oc login $OPENSHIFT_SERVER_URL --token=$OPENSHIFT_TOKEN --certificate-authority=ca.crt
           oc config set-context --current --namespace=llm-d-inference-scheduling
 
-      - name: Deploy benchmark job
-        id: deploy
+      - name: Execute benchmark job
+        id: execute
         run: |
           RELEASE_NAME="benchmark-pr-${{ github.event.issue.number }}-$(date +%s)"
           echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
@@ -100,16 +100,16 @@ jobs:
       - name: Wait for job completion
         id: results
         run: |
-          JOB_NAME="${{ steps.deploy.outputs.release_name }}"
+          JOB_NAME="${{ steps.execute.outputs.release_name }}"
           echo "Job name: $JOB_NAME"
 
-          oc wait --for=condition=complete --timeout=60m \
+          oc wait --for=condition=complete --timeout=120m \
             -n llm-d-inference-scheduling job/$JOB_NAME || true
 
       - name: Cleanup on failure
         if: failure()
         run: |
-          helm uninstall "${{ steps.deploy.outputs.release_name }}" \
+          helm uninstall "${{ steps.execute.outputs.release_name }}" \
             -n llm-d-inference-scheduling || true
 
       - name: Update reaction on completion
