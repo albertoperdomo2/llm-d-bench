@@ -99,7 +99,7 @@ jobs:
       - name: Wait for job completion
         id: results
         run: |
-          JOB_NAME="${{ steps.deploy.release_name }}"
+          JOB_NAME="${{ steps.deploy.outputs.release_name }}"
           echo "Job name: $JOB_NAME"
 
           oc wait --for=condition=complete --timeout=60m \
