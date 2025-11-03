@@ -1,5 +1,19 @@
 name: llm-d-bench via PR Comment
 
+# Trigger benchmarks with PR comments
+#
+# Usage:
+#   /benchmark <experiment-name>
+#
+# With parameter overrides:
+#   /benchmark <experiment-name>
+#   pvc.create=true
+#   benchmark.maxSeconds=600
+#   kueue.enabled=false
+#
+# Parameters use dot notation and override values from the experiment file.
+# Supports all Helm value types: strings, numbers, booleans, and comma-separated lists.
+
 on:
   issue_comment:
     types: [created]
@@ -36,11 +50,12 @@ jobs:
           ref: refs/pull/${{ github.event.issue.number }}/head
           repository: ${{ github.event.repository.full_name }}
 
-      - name: Parse experiment name
+      - name: Parse experiment name and overrides
         id: parse
         run: |
           COMMENT_BODY="${{ github.event.comment.body }}"
-          EXPERIMENT=$(echo "$COMMENT_BODY" | sed -n 's|^/benchmark \([^ ]*\).*|\1|p' | tr -d '\n\r')
+
+          EXPERIMENT=$(echo "$COMMENT_BODY" | head -1 | sed -n 's|^/benchmark \([^ ]*\).*|\1|p' | tr -d '\n\r')
 
           if [ -z "$EXPERIMENT" ]; then
             echo "error=No experiment specified" >> $GITHUB_OUTPUT
@@ -60,9 +75,46 @@ jobs:
             exit 1
           fi
 
+          # Parse override parameters from subsequent lines
+          # format: key.path=value
+          SET_ARGS=""
+          OVERRIDES_SUMMARY=""
+
+          while IFS= read -r line; do
+            if [[ -z "$line" ]] || [[ "$line" =~ ^/benchmark ]]; then
+              continue
+            fi
+
+            if [[ "$line" =~ ^[a-zA-Z0-9_.]+=[^[:space:]]+$ ]]; then
+              KEY=$(echo "$line" | cut -d= -f1 | tr -d '\n\r')
+              VALUE=$(echo "$line" | cut -d= -f2- | tr -d '\n\r')
+
+              if ! echo "$KEY" | grep -Eq '^[a-zA-Z0-9_.]+$'; then
+                echo "error=Invalid override key: $KEY" >> $GITHUB_OUTPUT
+                exit 1
+              fi
+
+              SET_ARGS="$SET_ARGS --set $KEY=$VALUE"
+              OVERRIDES_SUMMARY="${OVERRIDES_SUMMARY}- \`$KEY=$VALUE\`\n"
+            fi
+          done <<< "$COMMENT_BODY"
+
           echo "experiment=$EXPERIMENT" >> $GITHUB_OUTPUT
           echo "experiment_file=$EXPERIMENT_FILE" >> $GITHUB_OUTPUT
+          echo "set_args=$SET_ARGS" >> $GITHUB_OUTPUT
+
+          if [ -n "$OVERRIDES_SUMMARY" ]; then
+            echo "overrides_summary<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$OVERRIDES_SUMMARY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "overrides_summary=" >> $GITHUB_OUTPUT
+          fi
+
           echo "Experiment file: $EXPERIMENT_FILE"
+          if [ -n "$SET_ARGS" ]; then
+            echo "Override arguments: $SET_ARGS"
+          fi
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -90,12 +142,24 @@ jobs:
           RELEASE_NAME="benchmark-pr-${{ github.event.issue.number }}-$(date +%s)"
           echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
 
-          echo "Starting benchmark with experiment: ${{ steps.parse.outputs.experiment }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Benchmark Execution" >> $GITHUB_STEP_SUMMARY
+          echo "**Experiment:** \`${{ steps.parse.outputs.experiment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "${{ steps.parse.outputs.overrides_summary }}" ]; then
+            echo "**Parameter Overrides:**" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.parse.outputs.overrides_summary }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "**Release Name:** \`$RELEASE_NAME\`" >> $GITHUB_STEP_SUMMARY
 
           helm install "$RELEASE_NAME" ./llm-d-bench \
             -f "${{ steps.parse.outputs.experiment_file }}" \
             --set benchmark.name="$RELEASE_NAME" \
-            --set pvc.create=true -n llm-d-inference-scheduling
+            --set pvc.create=true \
+            ${{ steps.parse.outputs.set_args }} \
+            -n llm-d-inference-scheduling
 
       - name: Wait for job completion
         id: results
