@@ -142,18 +142,6 @@ jobs:
           RELEASE_NAME="benchmark-pr-${{ github.event.issue.number }}-$(date +%s)"
           echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
 
-          echo "## Benchmark Execution" >> $GITHUB_STEP_SUMMARY
-          echo "**Experiment:** \`${{ steps.parse.outputs.experiment }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ -n "${{ steps.parse.outputs.overrides_summary }}" ]; then
-            echo "**Parameter Overrides:**" >> $GITHUB_STEP_SUMMARY
-            echo "${{ steps.parse.outputs.overrides_summary }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "**Release Name:** \`$RELEASE_NAME\`" >> $GITHUB_STEP_SUMMARY
-
           helm install "$RELEASE_NAME" ./llm-d-bench \
             -f "${{ steps.parse.outputs.experiment_file }}" \
             --set benchmark.name="$RELEASE_NAME" \
