@@ -30,7 +30,7 @@ jobs:
       github.actor == github.repository_owner
 
     environment: benchmark
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, openshift]
 
     steps:
       - name: React to comment
@@ -157,7 +157,6 @@ jobs:
           helm install "$RELEASE_NAME" ./llm-d-bench \
             -f "${{ steps.parse.outputs.experiment_file }}" \
             --set benchmark.name="$RELEASE_NAME" \
-            --set pvc.create=true \
             ${{ steps.parse.outputs.set_args }} \
             -n llm-d-inference-scheduling
 
