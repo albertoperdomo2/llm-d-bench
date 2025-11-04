@@ -1,8 +1,0 @@
-# Example: Create only the PVC
-
-namespace: keda
-
-pvc:
-  create: true
-  name: guidellm-pvc
-  size: 100Gi

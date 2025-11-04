@@ -1,17 +1,18 @@
-# Qwen 0.6B Baseline Benchmark Experiment
-# Tests basic performance with simple token specifications
+# Example: GuideLLM Benchmark with MLflow Integration
+#
+# This example demonstrates how to run a GuideLLM benchmark with MLflow experiment tracking enabled.
+#
+
 namespace: llm-d-inference-scheduling
 
 benchmark:
-  name: qwen-06b-baseline
+  name: mlflow-test
 
-  # Image configuration
   image:
     repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduling/guidellm-custom"
     tag: "latest"
     pullPolicy: Always
 
-  # No affinity selectors
   affinity: null
 
   # Target inference endpoint
@@ -35,14 +36,10 @@ benchmark:
 # MLflow experiment tracking configuration
 mlflow:
   enabled: true
-
-  # MLFlow tracking URI
   trackingUri: "https://mlflow-mlflow.apps.aperdomo-lab.ibm.rhperfscale.org"
-
   # Experiment name (groups related benchmark runs together)
-  experimentName: "qwen-0.6b-baseline"
-
-  # Authentication secret (must exist in the same namespace!)
+  experimentName: "qwen-0.6b-performance-testing"
+  # Authentication secret (must exist in the same namespace)
   auth:
     secretName: "mlflow-auth"
     usernameKey: "admin-username"
@@ -52,14 +49,13 @@ mlflow:
   s3:
     # Secret name containing S3 credentials
     secretName: "mlflow-s3-secret"
-
     # Keys in the secret for S3 credentials
     accessKey: "access-key"
     secretKey: "secret-key"
     bucketNameKey: "bucket-name"
     regionKey: "region"
 
-# Kueue batching
+# Optional: Kueue batching
 kueue:
   enabled: false
   queueName: "guidellm-jobs"

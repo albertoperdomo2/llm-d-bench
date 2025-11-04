@@ -11,10 +11,12 @@ benchmark:
   # Job name
   name: guidellm-test
 
-  # Image
+  # Image - For custom images, specify repository and tag.
+  # If repository is empty, the default guidellm image with configmap script will be used.
   image:
-    repository: "ghcr.io/vllm-project/guidellm"
-    tag: "latest"
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
 
   # Environment variables for the benchmark container
   # Add any GUIDELLM__ prefixed vars here
@@ -52,18 +54,6 @@ benchmark:
 # Log pod matching label for collecting logs from model serving pods
 logPodMatchingLabel: "llm-d.ai/model=ms-inference-scheduling-llm-d-modelservice"
 
-# PVC configuration
-pvc:
-  # Create the PVC (set to true if PVC doesn't exist yet)
-  # Set to false to reuse an existing PVC across multiple experiments
-  create: false
-
-  # PVC name - use the same name across experiments to share results
-  name: guidellm-pvc
-
-  # PVC size (only applies if create: true)
-  size: 50Gi
-
 # Kueue batching configuration
 kueue:
   # Enable Kueue batching
@@ -71,21 +61,39 @@ kueue:
   # Kueue queue name
   queueName: "guidellm-jobs"
 
-# S3 configuration
-s3:
-  # Enable S3 upload
+# MLflow configuration
+mlflow:
+  # Enable MLflow experiment tracking
   enabled: false
 
-  # S3 bucket name
-  bucket: ""
+  # MLflow tracking server URL
+  # Example: "http://mlflow.mlflow.svc.cluster.local:5000" (internal service)
+  # or "https://mlflow-mlflow.apps.your-cluster.com" (via route)
+  trackingUri: ""
 
-  # S3 endpoint URL
-  endpoint: ""
+  # MLflow experiment name (if not provided, will use benchmark.name)
+  experimentName: ""
 
-  # S3 region
-  region: ""
+  # MLflow authentication secret
+  # NOTE: The secret must exist in the same namespace as the benchmark job.
+  # To use the mlflow-auth secret from the mlflow namespace, copy it:
+  #   oc get secret mlflow-auth -n mlflow -o yaml | \
+  #   sed 's/namespace: mlflow/namespace: <your-namespace>/' | \
+  #   oc apply -f -
+  auth:
+    # Secret name containing MLflow credentials (in the same namespace)
+    secretName: "mlflow-auth"
+    # Keys in the secret
+    usernameKey: "admin-username"
+    passwordKey: "admin-password"
 
-  # Secret containing S3 credentials
-  # The secret must have keys: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-  secretName: "aws-credentials"
+  # S3 credentials for MLflow artifact store
+  s3:
+    # Secret name containing S3 credentials
+    secretName: "mlflow-s3-creds"
+    # Keys in the secret for S3 credentials
+    accessKey: "AWS_ACCESS_KEY_ID"
+    secretKey: "AWS_SECRET_ACCESS_KEY"
+    bucketNameKey: "bucket-name"
+    regionKey: "region"
 

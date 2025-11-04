@@ -9,7 +9,7 @@ metadata:
     app: llm-d-bench
     job-type: benchmark
     {{- if .Values.kueue.enabled }}
-    kueue.x-k8s.io/queue-name: "{{ .Values.kueue.queueName }}"
+    kueue.x-k-s.io/queue-name: "{{ .Values.kueue.queueName }}"
     {{- end }}
 spec:
   {{- if .Values.kueue.enabled }}
@@ -24,123 +24,83 @@ spec:
       containers:
       - name: guidellm
         image: "{{ .Values.benchmark.image.repository }}:{{ .Values.benchmark.image.tag }}"
+        imagePullPolicy: {{ .Values.benchmark.image.pullPolicy | quote }}
+        args:
+          - "--target"
+          - "{{ .Values.benchmark.target }}"
+          {{- if .Values.benchmark.model }}
+          - "--model"
+          - "{{ .Values.benchmark.model }}"
+          {{- end }}
+          {{- if .Values.benchmark.processor }}
+          - "--processor"
+          - "{{ .Values.benchmark.processor }}"
+          {{- end }}
+          {{- if .Values.benchmark.rateType }}
+          - "--rate-type"
+          - "{{ .Values.benchmark.rateType }}"
+          {{- end }}
+          {{- if .Values.benchmark.rate }}
+          - "--rate"
+          - "{{ if kindIs "slice" .Values.benchmark.rate }}{{ join "," .Values.benchmark.rate }}{{ else }}{{ .Values.benchmark.rate }}{{ end }}"
+          {{- end }}
+          {{- if .Values.benchmark.data }}
+          - "--data"
+          - "{{ if kindIs "slice" .Values.benchmark.data }}{{ join "," .Values.benchmark.data }}{{ else }}{{ .Values.benchmark.data }}{{ end }}"
+          {{- end }}
+          {{- if .Values.benchmark.maxSeconds }}
+          - "--max-seconds"
+          - "{{ .Values.benchmark.maxSeconds }}"
+          {{- end }}
+          {{- if .Values.benchmark.additionalArgs }}
+          - "{{ .Values.benchmark.additionalArgs }}"
+          {{- end }}
         env:
+          - name: MLFLOW_TRACKING_INSECURE_TLS
+            value: "true"
           - name: HF_CLI_TOKEN
             valueFrom:
               secretKeyRef:
                 name: huggingface-token
                 key: HF_CLI_TOKEN
+          - name: MLFLOW_TRACKING_URI
+            value: {{ .Values.mlflow.trackingUri | quote }}
+          - name: MLFLOW_TRACKING_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mlflow.auth.secretName }}
+                key: {{ .Values.mlflow.auth.usernameKey }}
+          - name: MLFLOW_TRACKING_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mlflow.auth.secretName }}
+                key: {{ .Values.mlflow.auth.passwordKey }}
+          - name: MLFLOW_EXPERIMENT_NAME
+            value: {{ .Values.mlflow.experimentName | default .Values.benchmark.name | quote }}
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mlflow.s3.secretName }}
+                key: {{ .Values.mlflow.s3.accessKey }}
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mlflow.s3.secretName }}
+                key: {{ .Values.mlflow.s3.secretKey }}
+          - name: AWS_REGION
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mlflow.s3.secretName }}
+                key: {{ .Values.mlflow.s3.regionKey }}
+          - name: MLFLOW_S3_BUCKET_NAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mlflow.s3.secretName }}
+                key: {{ .Values.mlflow.s3.bucketNameKey }}
           {{- range $key, $value := .Values.benchmark.env }}
           - name: {{ $key }}
             value: {{ $value | quote }}
           {{- end }}
-        command: ["/bin/bash"]
-        args:
-          - -c
-          - |
-            set -euo pipefail
-
-            export RUN_DIR="/results/run_$(date +%s)"
-            mkdir -p ${RUN_DIR}
-            export GUIDELLM__LOGGING__LOG_FILE="${RUN_DIR}/console.log"
-
-            echo "[JOB] Creating cache directory..."
-            mkdir -p /results/.huggingface
-            export HF_HOME="/results/.huggingface"
-
-            echo "[JOB] Logging into Hugging Face..."
-            hf auth login --token $HF_CLI_TOKEN
-
-            echo "[JOB] Command: guidellm benchmark run \
-              {{- if .Values.benchmark.target }}
-              --target {{ .Values.benchmark.target }} \
-              {{- end }}
-              {{- if .Values.benchmark.model }}
-              --model {{ .Values.benchmark.model }} \
-              {{- end }}
-              {{- if .Values.benchmark.processor }}
-              --processor {{ .Values.benchmark.processor }} \
-              {{- end }}
-              {{- if .Values.benchmark.backendType }}
-              --backend-type {{ .Values.benchmark.backendType }} \
-              {{- end }}
-              {{- if .Values.benchmark.rateType }}
-              --rate-type={{ .Values.benchmark.rateType }} \
-              {{- end }}
-              {{- if .Values.benchmark.rate }}
-              --rate={{ if kindIs "slice" .Values.benchmark.rate }}{{ join "," .Values.benchmark.rate }}{{ else }}{{ .Values.benchmark.rate }}{{ end }} \
-              {{- end }}
-              {{- if .Values.benchmark.data }}
-              --data={{ if kindIs "slice" .Values.benchmark.data }}{{ join "," .Values.benchmark.data }}{{ else }}{{ .Values.benchmark.data }}{{ end }} \
-              {{- end }}
-              {{- if .Values.benchmark.maxSeconds }}
-              --max-seconds={{ .Values.benchmark.maxSeconds }} \
-              {{- end }}
-              {{- if .Values.benchmark.additionalArgs }}
-              {{ .Values.benchmark.additionalArgs }} \
-              {{- end }}
-              --output-path \${RUN_DIR}/output.json"
-
-            echo "[JOB] Running guidellm..."
-            guidellm benchmark run \
-              {{- if .Values.benchmark.target }}
-              --target {{ .Values.benchmark.target }} \
-              {{- end }}
-              {{- if .Values.benchmark.model }}
-              --model {{ .Values.benchmark.model }} \
-              {{- end }}
-              {{- if .Values.benchmark.processor }}
-              --processor {{ .Values.benchmark.processor }} \
-              {{- end }}
-              {{- if .Values.benchmark.backendType }}
-              --backend-type {{ .Values.benchmark.backendType }} \
-              {{- end }}
-              {{- if .Values.benchmark.rateType }}
-              --rate-type={{ .Values.benchmark.rateType }} \
-              {{- end }}
-              {{- if .Values.benchmark.rate }}
-              --rate={{ if kindIs "slice" .Values.benchmark.rate }}{{ join "," .Values.benchmark.rate }}{{ else }}{{ .Values.benchmark.rate }}{{ end }} \
-              {{- end }}
-              {{- if .Values.benchmark.data }}
-              --data={{ if kindIs "slice" .Values.benchmark.data }}{{ join "," .Values.benchmark.data }}{{ else }}{{ .Values.benchmark.data }}{{ end }} \
-              {{- end }}
-              {{- if .Values.benchmark.maxSeconds }}
-              --max-seconds={{ .Values.benchmark.maxSeconds }} \
-              {{- end }}
-              {{- if .Values.benchmark.additionalArgs }}
-              {{ .Values.benchmark.additionalArgs }} \
-              {{- end }}
-              --output-path ${RUN_DIR}/output.json
-
-            echo "[JOB] Output file checksum:"
-            sha256sum "${RUN_DIR}/output.json" || echo "[JOB] Error: Failed to generate checksum"
-            echo "[JOB] Results saved to ${RUN_DIR}"
-
-            {{- if .Values.s3.enabled }}
-            # Create a marker file to signal the s3-uploader to start
-            echo "${RUN_DIR}" > /results/upload-marker
-
-            echo "[JOB] Benchmark script finished. Waiting for S3 upload to complete..."
-            # Wait for the sidecar to remove the marker file (with 5-minute timeout)
-            WAIT_SECONDS=0
-            MAX_WAIT_SECONDS=300
-            while [ -f "/results/upload-marker" ] && [ $WAIT_SECONDS -lt $MAX_WAIT_SECONDS ]; do
-              sleep 5
-              WAIT_SECONDS=$((WAIT_SECONDS + 5))
-            done
-
-            if [ -f "/results/upload-marker" ]; then
-              echo "[JOB] Warning: S3 upload timed out after ${MAX_WAIT_SECONDS}s. Results remain in PVC."
-              rm -f /results/upload-marker
-            else
-              echo "[JOB] S3 upload complete. Exiting."
-            fi
-            {{- else }}
-            echo "[JOB] Benchmark complete. Results saved locally."
-            {{- end }}
-        volumeMounts:
-        - name: results
-          mountPath: /results
         resources:
           requests:
             memory: "2Gi"
@@ -148,87 +108,6 @@ spec:
           limits:
             memory: "4Gi"
             cpu: "1000m"
-      {{- if .Values.s3.enabled }}
-      - name: s3-uploader
-        image: "amazon/aws-cli:latest"
-        env:
-          - name: AWS_ACCESS_KEY_ID
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.s3.secretName }}
-                key: AWS_ACCESS_KEY_ID
-          - name: AWS_SECRET_ACCESS_KEY
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.s3.secretName }}
-                key: AWS_SECRET_ACCESS_KEY
-        command: ["/bin/bash"]
-        args:
-          - -c
-          - |
-            set -e
-            DONE_FILE_PATH="/results/upload-marker"
-
-            trap 'rm -f ${DONE_FILE_PATH}' EXIT
-
-            echo "[JOB] S3 uploader started, waiting for benchmark to complete..."
-
-            # Wait for marker file with timeout (max 2 hours)
-            WAIT_SECONDS=0
-            MAX_WAIT_SECONDS=7200
-            while [ ! -f "${DONE_FILE_PATH}" ] && [ $WAIT_SECONDS -lt $MAX_WAIT_SECONDS ]; do
-              echo -ne "[JOB] Waiting for benchmark completion marker (${WAIT_SECONDS}s)\r"
-              sleep 5
-              WAIT_SECONDS=$((WAIT_SECONDS + 5))
-            done
-            echo ""
-
-            if [ ! -f "${DONE_FILE_PATH}" ]; then
-              echo "[JOB] Error: Benchmark did not complete within ${MAX_WAIT_SECONDS}s. Exiting."
-              exit 1
-            fi
-
-            RUN_DIR=$(cat "${DONE_FILE_PATH}")
-            S3_BASE_PATH="s3://{{ .Values.s3.bucket }}/llm-d-bench/$(basename ${RUN_DIR})"
-
-            if [ ! -d "${RUN_DIR}" ]; then
-              echo "[JOB] Error: Run directory not found at ${RUN_DIR}. Skipping upload."
-              exit 0
-            fi
-
-            echo "[JOB] Benchmark complete. Syncing results directory to S3..."
-            echo "[JOB] Source: ${RUN_DIR}"
-            echo "[JOB] Destination: ${S3_BASE_PATH}/"
-
-            # Sync entire run directory to S3
-            if aws s3 sync "${RUN_DIR}" "${S3_BASE_PATH}/" \
-              {{- if .Values.s3.endpoint }}
-              --endpoint-url {{ .Values.s3.endpoint }} \
-              {{- end }}
-              --region {{ .Values.s3.region }}; then
-              echo "[JOB] Results successfully synced to S3 bucket: {{ .Values.s3.bucket }}"
-              echo "[JOB] S3 path: ${S3_BASE_PATH}/"
-            else
-              echo "[JOB] Error: S3 sync failed. Results remain in PVC only."
-              exit 1
-            fi
-
-            echo "[JOB] S3 uploader finished."
-        volumeMounts:
-        - name: results
-          mountPath: /results
-        resources:
-          requests:
-            memory: "2Gi"
-            cpu: "500m"
-          limits:
-            memory: "4Gi"
-            cpu: "1000m"
-      {{- end }}
-      volumes:
-      - name: results
-        persistentVolumeClaim:
-          claimName: {{ .Values.pvc.name }}
       restartPolicy: Never
       {{- if .Values.benchmark.nodeSelector }}
       nodeSelector:
