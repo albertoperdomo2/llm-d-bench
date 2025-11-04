@@ -1,165 +1,123 @@
 # llm-d-bench
 
-Helm chart for benchmarking `llm-d` inference endpoints on OpenShift using GuideLLM.
+Automated [llm-d](https://llm-d.ai/) inference benchmarking on OpenShift with MLflow tracking and GitHub Actions integration, by using [GuideLLM](https://github.com/vllm-project/guidellm).
 
-## Quick Start
+## Quick Setup
 
 ```bash
 # Create Hugging Face token secret
 oc create secret generic huggingface-token \
   --from-literal=HF_CLI_TOKEN=your-token \
-  -n keda
-
-# Create AWS credentials secret for S3 upload (optional)
-oc create secret generic aws-credentials \
-  --from-literal=AWS_ACCESS_KEY_ID=your-access-key \
-  --from-literal=AWS_SECRET_ACCESS_KEY=your-secret-key \
-  -n keda
-
-# Run benchmark
-helm install my-benchmark ./llm-d-bench \
-  --set benchmark.target=http://llm-service:8080 \
-  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
-  --set 'benchmark.rate={1,50,100}' \
-  -n keda
-
-# Monitor
-oc logs -f job/my-benchmark -n keda
+  -n llm-d-inference-scheduling
 ```
+
+### 1. Deploy Infrastructure
+
+```bash
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your credentials
+
+# Deploy MLflow, PostgreSQL, and GitHub runners
+./bootstrap.sh
+```
+
+This deploys:
+- **MLflow** - Experiment tracking with PostgreSQL backend and S3 storage
+- **Self-hosted GitHub runners** - Run benchmarks via PR comments
+- **Custom benchmark image** - Built and pushed to OpenShift registry
+
+### 2. Run Benchmarks
+
+**Via GitHub Actions (recommended):**
+```
+# Comment on any PR:
+/benchmark qwen-0.6b-baseline
+
+# With parameter overrides:
+/benchmark qwen-0.6b-baseline
+benchmark.maxSeconds=600
+```
+
+> [!WARNING]  
+> This repo does not handle llm-d or model deployment, so you need to make sure which model is running to make sure the benchmark succeeds.
+
+**Via Helm:**
+```bash
+helm install my-bench ./llm-d-bench \
+  -f llm-d-bench/experiments/qwen-0.6b-baseline.yaml \
+  -n llm-d-inference-scheduling
+```
+
+## Adding Benchmarks
+
+See [`llm-d-bench/ADDING_BENCHMARKS.md`](llm-d-bench/ADDING_BENCHMARKS.md) for adding new benchmark tools.
+
+**Quick summary:**
+1. Add benchmark implementation to `llm-d-bench/templates/benchmarks/<tool-name>/`
+2. Create experiment config in `llm-d-bench/experiments/`
+3. Trigger via `/benchmark <experiment-name>` in PR comments
+
+For new experiments, add them in `llm-d-bench/experiments`.
+
+## GitHub Action Workflow
+
+The benchmark workflow (`.github/workflows/benchmark.yaml`) triggers on PR comments:
+
+**How it works:**
+1. User comments `/benchmark <experiment>` on a PR
+2. Self-hosted runner picks up the job
+3. Checks out PR branch
+4. Runs Helm install with experiment config
+5. Waits for job completion (up to 12 hours)
+6. Reacts with 🚀 on success or 😕 on failure
+
+**Requirements:**
+- Self-hosted runner with label `openshift`
+- GitHub environment named `benchmark`
+- OpenShift secrets: `OPENSHIFT_SERVER_URL`, `OPENSHIFT_CA_CERT`, `OPENSHIFT_TOKEN`
+- Only repository owner can trigger benchmarks
 
 ## Configuration
 
-Key parameters in `values.yaml`:
+### Environment Variables (.env)
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `benchmark.target` | Target llm-d endpoint | - |
-| `benchmark.model` | Model name | - |
-| `benchmark.rate` | Concurrent rates (e.g., `{1,50,100}` with --set) | - |
-| `benchmark.data` | Number of requests or token specs (e.g., `{prompt_tokens=1000,output_tokens=1000}` with --set) | `1000` |
-| `benchmark.maxSeconds` | Max runtime | `600` |
-| `benchmark.nodeSelector` | Node selector for scheduling | See values.yaml |
-| `benchmark.affinity` | Node affinity rules (excludes GPU nodes) | See values.yaml |
-| `pvc.create` | Create PVC for results (set to false to reuse existing) | `false` |
-| `pvc.size` | Storage size | `50Gi` |
-| `s3.enabled` | Enable S3 upload of results | `false` |
-| `s3.bucket` | S3 bucket name | - |
-| `s3.endpoint` | S3 endpoint URL | - |
-| `s3.region` | S3 region | - |
-| `s3.secretName` | Name of the secret with AWS credentials | `aws-credentials` |
-| `kueue.enabled` | Enable Kueue batching | `false` |
-| `kueue.queueName` | Kueue queue name | `guidellm-jobs` |
-
-## Usage
-
-### With experiment configurations (recommended)
-Use pre-configured experiment files from `experiments/` directory:
-
+**MLflow:**
 ```bash
-# First time: Create PVC (set create: true in experiment file)
-helm install qwen-baseline ./llm-d-bench \
-  -f llm-d-bench/experiments/qwen-0.6b-baseline.yaml \
-  -n llm-d-inference-scheduler
-
-# Subsequent runs: Reuse existing PVC
-helm install qwen-test2 ./llm-d-bench \
-  -f llm-d-bench/experiments/qwen-0.6b-baseline.yaml \
-  --set pvc.create=false \
-  -n llm-d-inference-scheduler
-
-# Monitor progress
-oc logs -f job/qwen-0.6b-baseline -n llm-d-inference-scheduler
+POSTGRES_PASSWORD=your-password
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+S3_BUCKET_NAME=your-bucket
+AWS_REGION=us-east-1
+MLFLOW_ADMIN_PASSWORD=your-password
 ```
 
-### With custom values file
+**GitHub Runners:**
 ```bash
-helm install test ./llm-d-bench -f examples/benchmark-example.yaml -n keda
+GITHUB_TOKEN=ghp_your_token
+GITHUB_OWNER=your-org-or-username
+GITHUB_REPOSITORY=                    # Empty for org-wide runners
+RUNNER_LABELS=openshift,self-hosted
+RUNNER_REPLICAS=2
 ```
 
-### With command-line parameters
-```bash
-# Basic benchmark with rate list
-helm install my-test ./llm-d-bench \
-  --set benchmark.target=http://llm-service:8080 \
-  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
-  --set 'benchmark.rate={1,50,100}' \
-  -n keda
+### Benchmark Parameters
 
-# Advanced benchmark with token specifications
-helm install my-test ./llm-d-bench \
-  --set benchmark.target=http://llm-service:8080 \
-  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
-  --set 'benchmark.rate={1,50,100,200}' \
-  --set 'benchmark.data={prompt_tokens=1000,output_tokens=1000}' \
-  -n keda
-```
-
-### S3 Upload and Kueue Integration
-```bash
-# Run benchmark with S3 upload enabled
-helm install my-benchmark ./llm-d-bench \
-  --set benchmark.target=http://llm-service:8080 \
-  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
-  --set s3.enabled=true \
-  --set s3.bucket=my-results-bucket \
-  --set s3.endpoint=https://s3.my-region.amazonaws.com \
-  --set s3.region=my-region \
-  -n keda
-
-# Run benchmark with Kueue batching enabled
-helm install my-batch-job ./llm-d-bench \
-  --set benchmark.target=http://llm-service:8080 \
-  --set benchmark.model=meta-llama/Llama-3.3-70B-Instruct \
-  --set kueue.enabled=true \
-  --set kueue.queueName=my-custom-queue \
-  -n keda
-```
-
-
-**Note:** When using `--set` with comma-separated values, wrap them in curly braces `{value1,value2}` so Helm handles them correctly.
+Key parameters in `llm-d-bench/values.yaml`:
+- `benchmark.target` - Target inference endpoint
+- `benchmark.model` - Model name
+- `benchmark.rate` - Concurrent request rates (e.g., `{1,50,100}`)
+- `benchmark.data` - Number of requests or token specs
+- `benchmark.maxSeconds` - Max runtime (default: 600s)
+- `mlflow.enabled` - Enable MLflow tracking
+- `kueue.enabled` - Enable Kueue queues. 
 
 ## Results
 
-Results are stored in the PVC under `/results/run_<timestamp>/`:
-- `console.log` - Execution logs
-- `output.json` - Benchmark results
+- **MLflow** - Experiments tracked if `mlflow.enabled=true`
 
-If S3 upload is enabled, results are automatically uploaded to your configured S3 bucket.
-
-### Accessing Results Locally (Optional)
-
-If you need to access results directly from the PVC:
-
+Access MLflow UI:
 ```bash
-# Browse PVC
-oc run -it --rm pvc-browser --image=busybox \
-  --overrides='{"spec":{"containers":[{"name":"pvc-browser","image":"busybox","command":["sh"],"stdin":true,"tty":true,"volumeMounts":[{"name":"data","mountPath":"/results"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"guidellm-pvc"}}]}}' \
-  -n keda
-
-# Or use the sync.sh script to copy results to your local machine
-./synch.sh run_<timestamp>
+oc get route mlflow -n mlflow -o jsonpath='{.spec.host}'
+# Login with credentials from .env
 ```
-
-## Adding Benchmark Tools
-
-See [ADDING_BENCHMARKS.md](llm-d-bench/ADDING_BENCHMARKS.md).
-
-## Experiments
-
-Pre-configured benchmark experiments are available in `llm-d-bench/experiments/`:
-- `qwen-0.6b-baseline.yaml` - Qwen 0.6B baseline benchmark
-- `benchmark-example.yaml` - General example configuration
-
-Create your own experiment files in this directory for repeatable benchmark scenarios.
-
-> [!IMPORTANT]
-> Experiment filenames must not contain periods (`.`) except for the `.yaml` extension. Use hyphens (`-`) or underscores (`_`) instead.
-> - Good: `my-experiment-v2.yaml`, `qwen_test.yaml`
-> - Bad: `my.experiment.yaml`, `test-v1.2.yaml`
-
-## Documentation
-
-- `llm-d-bench/values.yaml` - Full configuration options
-- `llm-d-bench/experiments/` - Pre-configured experiment files
-- `llm-d-bench/examples/` - Example configurations
-- `llm-d-bench/ADDING_BENCHMARKS.md` - Adding new tools

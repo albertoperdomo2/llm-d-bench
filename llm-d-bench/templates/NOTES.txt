@@ -7,10 +7,3 @@ To monitor the job:
 
   oc get job {{ .Values.benchmark.name }} -n {{ .Values.namespace }}
   oc logs job/{{ .Values.benchmark.name }} -n {{ .Values.namespace }} -f
-
-Results will be saved to:
-  PVC: {{ .Values.pvc.name }}
-  Path: /results/run_<timestamp>/
-{{- if .Values.s3.enabled }}
-  S3: s3://{{ .Values.s3.bucket }}/llm-d-bench/
-{{- end }}

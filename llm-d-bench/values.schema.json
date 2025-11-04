@@ -89,24 +89,6 @@
     "logPodMatchingLabel": {
       "type": "string"
     },
-    "pvc": {
-      "type": "object",
-      "properties": {
-        "create": {
-          "type": "boolean",
-          "description": "Whether to create a new PVC"
-        },
-        "name": {
-          "type": "string",
-          "description": "PVC name"
-        },
-        "size": {
-          "type": "string",
-          "pattern": "^[0-9]+(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|K)?$",
-          "description": "Storage size"
-        }
-      }
-    },
     "kueue": {
       "type": "object",
       "properties": {
@@ -118,25 +100,69 @@
         }
       }
     },
-    "s3": {
+    "mlflow": {
       "type": "object",
+      "description": "MLflow experiment tracking configuration",
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Enable MLflow experiment tracking"
         },
-        "bucket": {
-          "type": "string"
+        "trackingUri": {
+          "type": "string",
+          "description": "MLflow tracking server URL"
         },
-        "endpoint": {
-          "type": "string"
+        "experimentName": {
+          "type": "string",
+          "description": "MLflow experiment name (defaults to benchmark.name if not provided)"
         },
-        "region": {
-          "type": "string"
+        "auth": {
+          "type": "object",
+          "description": "MLflow authentication configuration",
+          "properties": {
+            "secretName": {
+              "type": "string",
+              "description": "Secret name containing MLflow credentials"
+            },
+            "usernameKey": {
+              "type": "string",
+              "description": "Key in the secret for username"
+            },
+            "passwordKey": {
+              "type": "string",
+              "description": "Key in the secret for password"
+            }
+          },
+          "required": ["secretName", "usernameKey", "passwordKey"]
         },
-        "secretName": {
-          "type": "string"
+        "s3": {
+          "type": "object",
+          "description": "MLflow S3 credentials from a secret",
+          "properties": {
+            "secretName": {
+              "type": "string",
+              "description": "Secret name containing S3 credentials"
+            },
+            "accessKey": {
+              "type": "string",
+              "description": "Key in the secret for AWS_ACCESS_KEY_ID"
+            },
+            "secretKey": {
+              "type": "string",
+              "description": "Key in the secret for AWS_SECRET_ACCESS_KEY"
+            },
+            "bucketNameKey": {
+              "type": "string",
+              "description": "Key in the secret for S3 bucket name (used to construct MLFLOW_ARTIFACTS_DESTINATION)"
+            },
+            "regionKey": {
+              "type": "string",
+              "description": "Key in the secret for AWS region"
+            }
+          }
         }
-      }
+      },
+      "required": ["enabled"]
     }
   }
 }
