@@ -75,6 +75,10 @@
         "maxSeconds": {
           "type": "string"
         },
+        "accelerator": {
+          "type": "string",
+          "description": "Accelerator type (e.g., nvidia-h100, nvidia-a100)"
+        },
         "additionalArgs": {
           "type": "string"
         },

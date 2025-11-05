@@ -33,6 +33,7 @@ benchmark:
   rate: ""                      # Rate values (e.g., "1,50,100,200")
   data: "1000"                  # Number of requests or data points
   maxSeconds: "600"             # Maximum seconds to run
+  accelerator: ""               # Accelerator type (e.g., nvidia-h100, nvidia-a100)
 
   # Additional GuideLLM arguments (optional)
   # Use this for any flags not covered by the above parameters

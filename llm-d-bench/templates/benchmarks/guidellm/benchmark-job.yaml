@@ -52,10 +52,16 @@ spec:
           - "--max-seconds"
           - "{{ .Values.benchmark.maxSeconds }}"
           {{- end }}
+          {{- if .Values.benchmark.accelerator }}
+          - "--accelerator"
+          - "{{ .Values.benchmark.accelerator }}"
+          {{- end }}
           {{- if .Values.benchmark.additionalArgs }}
           - "{{ .Values.benchmark.additionalArgs }}"
           {{- end }}
         env:
+          - name: HF_HOME
+            value: "/tmp/.huggingface"
           - name: MLFLOW_TRACKING_INSECURE_TLS
             value: "true"
           - name: HF_CLI_TOKEN
