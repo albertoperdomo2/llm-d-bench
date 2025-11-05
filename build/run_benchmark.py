@@ -217,7 +217,13 @@ def run_benchmark_with_mlflow(
                 "rates": rate,
             }
             if data:
-                params["data"] = data
+                # params["data"] = data  # log data profile splitted
+                params.update(
+                    {
+                        d.split("=")[0].strip(): d.split("=")[1].strip()
+                        for d in data.split(",")
+                    }
+                )
             if max_seconds:
                 params["max_seconds"] = max_seconds
             if max_requests:
