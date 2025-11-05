@@ -2,16 +2,19 @@
 
 Automated [llm-d](https://llm-d.ai/) inference benchmarking on OpenShift with MLflow tracking and GitHub Actions integration, by using [GuideLLM](https://github.com/vllm-project/guidellm).
 
+> This might work with any other LLM endpoint but has only been tested with `llm-d` endpoints.
+
 ## Quick Setup
 
-```bash
-# Create Hugging Face token secret
-oc create secret generic huggingface-token \
-  --from-literal=HF_CLI_TOKEN=your-token \
-  -n llm-d-inference-scheduling
-```
+This project uses the following: 
+
+  - [Reflector](https://github.com/emberstack/kubernetes-reflector) - Secret and ConfigMap mirroring across namespaces
+  - [Kueue](https://github.com/kubernetes-sigs/kueue) - For job batching
 
 ### 1. Deploy Infrastructure
+
+> [!NOTE]
+> AWS IAM Policy is handled by the user, see [`mlflow/AWS_IAM_POLICY.md`](mlflow/AWS_IAM_POLICY.md) for more.
 
 ```bash
 # Copy and configure environment
@@ -20,12 +23,16 @@ cp .env.example .env
 
 # Deploy MLflow, PostgreSQL, and GitHub runners
 ./bootstrap.sh
+
+# Dry run
+./bootstrap.sh --dry-run
 ```
 
 This deploys:
 - **MLflow** - Experiment tracking with PostgreSQL backend and S3 storage
 - **Self-hosted GitHub runners** - Run benchmarks via PR comments
 - **Custom benchmark image** - Built and pushed to OpenShift registry
+- All needed addons/operators (Kueue, Reflector).
 
 ### 2. Run Benchmarks
 
@@ -40,13 +47,13 @@ benchmark.maxSeconds=600
 ```
 
 > [!WARNING]  
-> This repo does not handle llm-d or model deployment, so you need to make sure which model is running to make sure the benchmark succeeds.
+> This repo does not handle llm-d deployment, so you need to make sure which model is running to make sure the benchmark succeeds.
 
 **Via Helm:**
 ```bash
-helm install my-bench ./llm-d-bench \
+helm install <your_deployment_name> ./llm-d-bench \
   -f llm-d-bench/experiments/qwen-0.6b-baseline.yaml \
-  -n llm-d-inference-scheduling
+  -n <your_namespace>
 ```
 
 ## Adding Benchmarks
@@ -59,6 +66,9 @@ See [`llm-d-bench/ADDING_BENCHMARKS.md`](llm-d-bench/ADDING_BENCHMARKS.md) for a
 3. Trigger via `/benchmark <experiment-name>` in PR comments
 
 For new experiments, add them in `llm-d-bench/experiments`.
+
+> [!NOTE]
+> Experiment names cannot include `.` for security reasons.
 
 ## GitHub Action Workflow
 
@@ -110,11 +120,11 @@ Key parameters in `llm-d-bench/values.yaml`:
 - `benchmark.data` - Number of requests or token specs
 - `benchmark.maxSeconds` - Max runtime (default: 600s)
 - `mlflow.enabled` - Enable MLflow tracking
-- `kueue.enabled` - Enable Kueue queues. 
+- `kueue.enabled` - Enable Kueue queues
 
 ## Results
 
-- **MLflow** - Experiments tracked if `mlflow.enabled=true`
+- **MLflow** - Experiments tracked if `mlflow.enabled=True`
 
 Access MLflow UI:
 ```bash

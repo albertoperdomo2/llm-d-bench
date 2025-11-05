@@ -23,10 +23,10 @@ benchmark:
 
   # Benchmark parameters
   rateType: concurrent
-  rate: "1,5"
+  rate: "1"
   data: "prompt_tokens=1000,output_tokens=1000"
   maxSeconds: "60"
-  accelerator: "H200"
+  accelerator: "L4"
 
   # Environment variables (optional)
   env:

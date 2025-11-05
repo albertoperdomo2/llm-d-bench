@@ -42,6 +42,10 @@ kind: Secret
 metadata:
   name: mlflow-s3-secret
   namespace: mlflow
+  annotations:
+    reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+    reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+    reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "${NAMESPACE}"
 type: Opaque
 stringData:
   access-key: ${AWS_ACCESS_KEY_ID}
@@ -54,7 +58,11 @@ kind: Secret
 metadata:
   name: mlflow-auth
   namespace: mlflow
+  annotations:
+    reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+    reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+    reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "${NAMESPACE}"
 type: Opaque
 stringData:
-  admin-username: ${MLFLOW_ADMIN_USERNAME:-admin}
+  admin-username: ${MLFLOW_ADMIN_USERNAME}
   admin-password: ${MLFLOW_ADMIN_PASSWORD}

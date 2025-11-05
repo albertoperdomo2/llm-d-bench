@@ -20,4 +20,4 @@ stringData:
   #   - For organization runners: repo + admin:org
   github_token: "${GITHUB_TOKEN}"
   github_owner: "${GITHUB_OWNER}"
-  github_repo: "${GITHUB_REPOSITORY:-}"
+  github_repo: "${GITHUB_REPOSITORY}"
