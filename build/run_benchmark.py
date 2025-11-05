@@ -1,163 +1,388 @@
-import os
-import sys
-import subprocess
-import json
-import mlflow
 import argparse
+import json
+import logging
+import subprocess
+import sys
+import os
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any
+
+import mlflow
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+
+def extract_metrics_from_benchmark(benchmark: Dict[str, Any]) -> Dict[str, Any]:
+    metrics = {}
+    try:
+        run_stats = benchmark.get("run_stats", {})
+        all_metrics = benchmark.get("metrics", {})
+
+        # Request stats
+        requests_made = run_stats.get("requests_made", {})
+        if "total" in requests_made:
+            metrics["total_requests"] = requests_made["total"]
+        if "successful" in requests_made:
+            metrics["successful_requests"] = requests_made["successful"]
+        if "errored" in requests_made:
+            metrics["failed_requests"] = requests_made["errored"]
+
+        # Error Rate
+        if metrics.get("total_requests", 0) > 0 and "failed_requests" in metrics:
+            metrics["error_rate"] = (
+                metrics["failed_requests"] / metrics["total_requests"]
+            )
+        elif "total_requests" in metrics:
+            metrics["error_rate"] = 0.0
+
+        # Throughput
+        req_throughput = all_metrics.get("requests_per_second", {}).get(
+            "successful", {}
+        )
+        if "mean" in req_throughput:
+            metrics["throughput_requests_per_sec"] = req_throughput["mean"]
+
+        tok_throughput = all_metrics.get("tokens_per_second", {}).get("successful", {})
+        if "mean" in tok_throughput:
+            metrics["throughput_tokens_per_sec"] = tok_throughput["mean"]
+
+        # Latency (Overall Request)
+        latency = all_metrics.get("request_latency", {}).get("successful", {})
+        latency_pct = latency.get("percentiles", {})
+        if "mean" in latency:
+            metrics["latency_mean_sec"] = latency["mean"]
+        if "median" in latency:
+            metrics["latency_median_sec"] = latency["median"]
+        if "p50" in latency_pct:
+            metrics["latency_p50_sec"] = latency_pct["p50"]
+        if "p90" in latency_pct:
+            metrics["latency_p90_sec"] = latency_pct["p90"]
+        if "p95" in latency_pct:
+            metrics["latency_p95_sec"] = latency_pct["p95"]
+        if "p99" in latency_pct:
+            metrics["latency_p99_sec"] = latency_pct["p99"]
+
+        # TTFT
+        ttft = all_metrics.get("time_to_first_token_ms", {}).get("successful", {})
+        ttft_pct = ttft.get("percentiles", {})
+        if "mean" in ttft:
+            metrics["ttft_mean_ms"] = ttft["mean"]
+        if "median" in ttft:
+            metrics["ttft_median_ms"] = ttft["median"]
+        if "p95" in ttft_pct:
+            metrics["ttft_p95_ms"] = ttft_pct["p95"]
+        if "p99" in ttft_pct:
+            metrics["ttft_p99_ms"] = ttft_pct["p99"]
+
+        # ITL
+        itl = all_metrics.get("inter_token_latency_ms", {}).get("successful", {})
+        itl_pct = itl.get("percentiles", {})
+        if "mean" in itl:
+            metrics["itl_mean_ms"] = itl["mean"]
+        if "median" in itl:
+            metrics["itl_median_ms"] = itl["median"]
+        if "p95" in itl_pct:
+            metrics["itl_p95_ms"] = itl_pct["p95"]
+
+        # Tokens
+        input_tokens = all_metrics.get("prompt_token_count", {}).get("successful", {})
+        output_tokens = all_metrics.get("output_token_count", {}).get("successful", {})
+
+        total_input = 0
+        if "total_sum" in input_tokens:
+            total_input = input_tokens["total_sum"]
+            metrics["total_input_tokens"] = total_input
+
+        total_output = 0
+        if "total_sum" in output_tokens:
+            total_output = output_tokens["total_sum"]
+            metrics["total_output_tokens"] = total_output
+
+        if total_input > 0 or total_output > 0:
+            metrics["total_tokens"] = total_input + total_output
+
+        logger.info(f"Extracted {len(metrics)} metrics from benchmark object")
+        return metrics
+
+    except Exception as e:
+        logger.error(
+            f"Error extracting metrics from benchmark object: {e}", exc_info=True
+        )
+        return {}
+
+
+def run_guidellm_cli(
+    target: str,
+    model: str,
+    rate: str,
+    backend_type: str = "openai_http",
+    rate_type: str = "concurrent",
+    data: str = None,
+    max_seconds: int = None,
+    max_requests: int = None,
+    processor: str = None,
+    output_path: str = "benchmark_output.json",
+) -> tuple[str, str]:
+    cmd = [
+        "guidellm",
+        "benchmark",
+        "run",
+        "--target",
+        target,
+        "--model",
+        model,
+        "--backend-type",
+        backend_type,
+        "--rate-type",
+        rate_type,
+        "--rate",
+        str(rate),
+        "--output-path",
+        output_path,
+    ]
+
+    if data:
+        cmd.extend(["--data", data])
+    if max_seconds:
+        cmd.extend(["--max-seconds", str(max_seconds)])
+    if max_requests:
+        cmd.extend(["--max-requests", str(max_requests)])
+    if processor:
+        cmd.extend(["--processor", processor])
+
+    logger.info(f"Running guidellm command: {' '.join(cmd)}")
+
+    console_log_path = output_path.replace(".json", "_console.log")
+
+    try:
+        with open(console_log_path, "w") as log_file:
+            _ = subprocess.run(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=True,
+            )
+
+        logger.info("Guidellm completed successfully")
+        return output_path, console_log_path
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Guidellm command failed with return code {e.returncode}")
+        return output_path, console_log_path
+
+
+def run_benchmark_with_mlflow(
+    target: str,
+    model: str,
+    rate: str,
+    backend_type: str = "openai_http",
+    rate_type: str = "concurrent",
+    data: str = None,
+    max_seconds: int = None,
+    max_requests: int = None,
+    processor: str = None,
+    accelerator: str = None,
+    experiment_name: str = "guidellm-benchmarks",
+    mlflow_tracking_uri: str = None,
+    tags: Dict[str, str] = None,
+) -> str:
+    if mlflow_tracking_uri:
+        mlflow.set_tracking_uri(mlflow_tracking_uri)
+
+    mlflow.set_experiment(experiment_name)
+
+    # Run name for the whole sweep
+    run_name = (
+        f"{model.split('/')[-1]}_sweep_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    )
+
+    logger.info(f"Starting benchmark sweep: rates={rate}")
+
+    with mlflow.start_run(run_name=run_name) as run:
+        try:
+            # Common params for the whole sweep
+            params = {
+                "target": target,
+                "model": model,
+                "backend_type": backend_type,
+                "rate_type": rate_type,
+                "rates": rate,
+            }
+            if data:
+                params["data"] = data
+            if max_seconds:
+                params["max_seconds"] = max_seconds
+            if max_requests:
+                params["max_requests"] = max_requests
+            if processor:
+                params["processor"] = processor
+            if accelerator:
+                params["accelerator"] = accelerator
+
+            mlflow.log_params(params)
+
+            default_tags = {
+                "model": model,
+                "rate_type": rate_type,
+            }
+            if accelerator:
+                default_tags["accelerator"] = accelerator
+            if tags:
+                default_tags.update(tags)
+
+            mlflow.set_tags(default_tags)
+
+            output_json = "/tmp/benchmark_sweep.json"
+            json_path, console_log_path = run_guidellm_cli(
+                target=target,
+                model=model,
+                rate=rate,
+                backend_type=backend_type,
+                rate_type=rate_type,
+                data=data,
+                max_seconds=max_seconds,
+                max_requests=max_requests,
+                processor=processor,
+                output_path=output_json,
+            )
+
+            if Path(json_path).exists():
+                with open(json_path, "r") as f:
+                    result_json = json.load(f)
+
+                benchmarks = result_json.get("benchmarks", [])
+                if not benchmarks:
+                    logger.warning("No benchmarks found in JSON output")
+
+                logger.info(f"Found {len(benchmarks)} benchmark results in JSON.")
+
+                for benchmark in benchmarks:
+                    concurrency_step = 0
+                    try:
+                        concurrency_step = int(benchmark["args"]["strategy"]["streams"])
+                    except (KeyError, TypeError, IndexError):
+                        try:
+                            # Fallback for other strategies
+                            concurrency_step = int(
+                                benchmark["args"]["profile"]["measured_concurrencies"][
+                                    0
+                                ]
+                            )
+                        except (KeyError, TypeError, IndexError):
+                            logger.warning(
+                                "Could not find concurrency 'streams' or 'measured_concurrencies'. "
+                                "Metrics will be logged without a step."
+                            )
+
+                    metrics = extract_metrics_from_benchmark(benchmark)
+
+                    if metrics:
+                        # Log each metric with the concurrency as the step
+                        for key, value in metrics.items():
+                            mlflow.log_metric(key, value, step=concurrency_step)
+
+                        logger.info(
+                            f"Logged {len(metrics)} metrics for step "
+                            f"(concurrency={concurrency_step})"
+                        )
+
+                mlflow.log_artifact(json_path, "results")
+                logger.info("Logged full JSON artifact")
+            else:
+                logger.warning(f"Output JSON not found: {json_path}")
+
+            if Path(console_log_path).exists():
+                mlflow.log_artifact(console_log_path, "logs")
+                logger.info("Logged console output")
+            else:
+                logger.warning(f"Console log not found: {console_log_path}")
+
+            logger.info(f"Run completed: {run.info.run_id}")
+            return run.info.run_id
+
+        except Exception as e:
+            logger.error(f"Benchmark sweep failed: {e}")
+            mlflow.log_param("error", str(e))
+            raise
 
 
 def main():
-    """
-    Main function to run the GuideLLM benchmark and log results to MLflow.
-    """
     parser = argparse.ArgumentParser(
-        description="Run GuideLLM benchmark and log to MLflow."
+        description="GuideLLM Benchmark with MLflow Logging",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--target", help="Target inference endpoint")
-    parser.add_argument("--model", help="Model configuration")
-    parser.add_argument("--processor", help="Processor for the model")
-    parser.add_argument("--rate-type", help="Rate type (e.g., concurrent)")
-    parser.add_argument("--rate", help="Rate of requests")
-    parser.add_argument("--data", help="Data for the benchmark")
-    parser.add_argument("--max-seconds", help="Maximum duration of the benchmark")
-    # Capture any other arguments for guidellm
-    parser.add_argument("additional_args", nargs=argparse.REMAINDER)
+
+    parser.add_argument("--target", required=True, help="Target URL")
+    parser.add_argument("--model", required=True, help="Model name")
+    parser.add_argument("--backend-type", default="openai_http", help="Backend type")
+    parser.add_argument("--rate-type", default="concurrent", help="Rate type")
+    parser.add_argument("--rate", required=True, help="Rate value(s), comma-separated")
+    parser.add_argument(
+        "--data", help="Data config (e.g., 'prompt_tokens=1000,output_tokens=1000')"
+    )
+    parser.add_argument("--max-seconds", type=int, help="Max duration in seconds")
+    parser.add_argument("--max-requests", type=int, help="Max number of requests")
+    parser.add_argument("--processor", help="Processor/tokenizer name")
+
+    parser.add_argument("--accelerator", help="Accelerator type (e.g., H200, A100)")
+
+    parser.add_argument(
+        "--experiment-name",
+        default="guidellm-benchmarks",
+        help="MLflow experiment name",
+    )
+    parser.add_argument("--mlflow-tracking-uri", help="MLflow tracking URI")
+    parser.add_argument(
+        "--tag", action="append", dest="tags", help="Additional tags (key=value)"
+    )
 
     args = parser.parse_args()
 
-    # --- Setup ---
-    work_dir = f"/tmp/benchmark-{datetime.now().strftime('%s')}"
-    os.makedirs(work_dir, exist_ok=True)
-    os.environ["GUIDELLM__LOGGING__LOG_FILE"] = f"{work_dir}/console.log"
-    print(f"[JOB] Working directory: {work_dir}")
+    tags = {}
+    if args.tags:
+        for tag in args.tags:
+            key, value = tag.split("=", 1)
+            tags[key.strip()] = value.strip()
 
-    hf_home = "/tmp/.huggingface"
-    os.makedirs(hf_home, exist_ok=True)
-    os.environ["HF_HOME"] = hf_home
-    print(f"[JOB] Hugging Face home: {hf_home}")
+    logger.info(f"Starting benchmark sweep for rates: {args.rate}")
 
-    hf_token = os.environ.get("HF_CLI_TOKEN")
-    if hf_token:
-        print("[JOB] Logging into Hugging Face...")
-        subprocess.run(["huggingface-cli", "login", "--token", hf_token], check=True)
-
-    print("[JOB] Forming MLFLOW_ARTIFACTS_DESTINATION variable")
-    os.environ["MLFLOW_ARTIFACTS_DESTINATION"] = (
-        f"s3://{os.environ['MLFLOW_S3_BUCKET_NAME']}"
+    # Log in to HF
+    subprocess.run(
+        ["huggingface-cli", "login", "--token", os.environ.get("HF_CLI_TOKEN")],
+        check=True,
     )
 
-    # Construct guidellm arguments from parsed args
-    guidellm_args = []
-    mlflow_params = {}
-    for arg, value in vars(args).items():
-        if arg == "additional_args":
-            continue
-        if value is not None:
-            arg_name = f"--{arg.replace('_', '-')}"
-            guidellm_args.extend([arg_name, str(value)])
-            mlflow_params[arg] = value
-
-    # Add any additional args
-    if args.additional_args:
-        guidellm_args.extend(args.additional_args)
-
-    # --- MLflow Integration ---
-    if not os.environ.get("MLFLOW_TRACKING_URI"):
-        print("[JOB] MLFLOW_TRACKING_URI not set. Running benchmark without MLflow.")
-        run_benchmark(work_dir, guidellm_args)
-        return
-
     try:
-        experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME", "guidellm-benchmark")
-        mlflow.set_experiment(experiment_name)
-        print(f"[JOB] MLflow experiment set to: {experiment_name}")
-
-        with mlflow.start_run() as run:
-            print(f"[JOB] Started MLflow run: {run.info.run_id}")
-
-            # Log parameters from CLI args
-            mlflow.log_params(mlflow_params)
-            print(f"[JOB] Parameters logged to MLflow: {mlflow_params}")
-
-            # Log parameters from environment
-            env_params = {
-                key: value
-                for key, value in os.environ.items()
-                if key.startswith("GUIDELLM_") or key.startswith("BENCHMARK_")
-            }
-            mlflow.log_params(env_params)
-            print(f"[JOB] Environment parameters logged to MLflow: {env_params}")
-
-            # Run the benchmark
-            exit_code = run_benchmark(work_dir, guidellm_args)
-
-            # Log results
-            log_mlflow_results(work_dir, exit_code)
-
+        run_id = run_benchmark_with_mlflow(
+            target=args.target,
+            model=args.model,
+            rate=args.rate,
+            backend_type=args.backend_type,
+            rate_type=args.rate_type,
+            data=args.data,
+            max_seconds=args.max_seconds,
+            max_requests=args.max_requests,
+            processor=args.processor,
+            accelerator=args.accelerator,
+            experiment_name=args.experiment_name,
+            mlflow_tracking_uri=args.mlflow_tracking_uri,
+            tags=tags,
+        )
+        logger.info("\nBenchmark sweep completed successfully.")
+        logger.info(f"  MLflow Run ID: {run_id}")
+        return 0
     except Exception as e:
-        print(f"[JOB] An error occurred during the MLflow tracked run: {e}")
-        sys.exit(1)
-
-
-def run_benchmark(work_dir, args):
-    """
-    Executes the guidellm benchmark command.
-    """
-    output_path = f"{work_dir}/output.json"
-    command = ["guidellm", "benchmark", "run"] + args + ["--output-path", output_path]
-
-    print(f"[JOB] Running command: {' '.join(command)}")
-    result = subprocess.run(command)
-    exit_code = result.returncode
-    print(f"[JOB] GuideLLM completed with exit code: {exit_code}")
-
-    if os.path.exists(output_path):
-        subprocess.run(["sha256sum", output_path])
-    else:
-        print("[JOB] Error: Output file not found after benchmark run.")
-
-    return exit_code
-
-
-def log_mlflow_results(work_dir, exit_code):
-    """
-    Logs benchmark artifacts and metrics to MLflow.
-    """
-    print("[JOB] Logging results to MLflow...")
-    output_file = f"{work_dir}/output.json"
-    console_log = f"{work_dir}/console.log"
-
-    # Log artifacts
-    if os.path.exists(output_file):
-        mlflow.log_artifact(output_file, artifact_path="results")
-        try:
-            with open(output_file, "r") as f:
-                results = json.load(f)
-            if isinstance(results, dict) and "metrics" in results:
-                mlflow.log_metrics(results.get("metrics", {}))
-        except (json.JSONDecodeError, TypeError) as e:
-            print(
-                f"[JOB] Warning: Could not parse or process output.json for metrics: {e}"
-            )
-    else:
-        mlflow.log_param("error", "output_file_not_found")
-
-    if os.path.exists(console_log):
-        mlflow.log_artifact(console_log, artifact_path="logs")
-
-    # Log exit code and set status
-    mlflow.log_metric("guidellm_exit_code", exit_code)
-    status = "success" if exit_code == 0 else "failed"
-    mlflow.set_tag("status", status)
-    print("[JOB] Results logged to MLflow successfully")
-
-    if exit_code != 0:
-        print(f"[JOB] Benchmark failed with exit code: {exit_code}")
-        sys.exit(exit_code)
-    else:
-        print("[JOB] Benchmark completed successfully!")
+        logger.error(f"Benchmark sweep failed: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
