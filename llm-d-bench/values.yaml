@@ -62,6 +62,14 @@ kueue:
   # Kueue queue name
   queueName: "guidellm-jobs"
 
+  # Multi-cluster configuration
+  multiCluster:
+    # Enable multi-cluster support
+    enabled: false
+    # Target cluster name (optional - if not specified, uses default cluster)
+    # This should match a ClusterQueue name in your Kueue setup
+    targetCluster: ""
+
 # MLflow configuration
 mlflow:
   # Enable MLflow experiment tracking

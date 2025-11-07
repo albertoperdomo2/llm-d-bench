@@ -9,8 +9,12 @@ metadata:
     app: llm-d-bench
     job-type: benchmark
     {{- if .Values.kueue.enabled }}
-    kueue.x-k-s.io/queue-name: "{{ .Values.kueue.queueName }}"
+    kueue.x-k8s.io/queue-name: "{{ .Values.kueue.queueName }}"
     {{- end }}
+  {{- if and .Values.kueue.enabled .Values.kueue.multiCluster.enabled .Values.kueue.multiCluster.targetCluster }}
+  annotations:
+    kueue.x-k8s.io/target-cluster: "{{ .Values.kueue.multiCluster.targetCluster }}"
+  {{- end }}
 spec:
   {{- if .Values.kueue.enabled }}
   suspend: true

@@ -1,0 +1,44 @@
+---
+# Worker Cluster Setup Template
+# Apply this on EACH worker cluster that will execute workloads
+# Applied automatically by add-cluster.sh using envsubst
+
+# 1. Create the namespace if it doesn't exist
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NAMESPACE}
+---
+# 2. ResourceFlavor on worker cluster
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+# 3. ClusterQueue on worker cluster (mirrors management cluster)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: ${CLUSTER_QUEUE_NAME}
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: "cpu"
+              nominalQuota: 1000
+            - name: "memory"
+              nominalQuota: 1000Gi
+            - name: "nvidia.com/gpu"
+              nominalQuota: 100
+---
+# 4. LocalQueue on worker cluster
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: guidellm-jobs
+  namespace: ${NAMESPACE}
+spec:
+  clusterQueue: ${CLUSTER_QUEUE_NAME}

@@ -278,40 +278,24 @@ deploy_kueue() {
         fi
     fi
 
-    log_step "Applying Kueue configurations..."
+    log_step "Applying management cluster Kueue setup..."
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        cp "${KUEUE_DIR}/01-resource-flavor.yaml" "${DRY_RUN_DIR}/kueue/01-resource-flavor.yaml"
-        log_success "Copied: ${DRY_RUN_DIR}/kueue/01-resource-flavor.yaml"
+        envsubst < "${KUEUE_DIR}/00-management-cluster-setup.yaml" > "${DRY_RUN_DIR}/kueue/00-management-cluster-setup.yaml"
+        log_success "Generated: ${DRY_RUN_DIR}/kueue/00-management-cluster-setup.yaml"
     else
-        oc apply -f "${KUEUE_DIR}/01-resource-flavor.yaml"
-        log_success "ResourceFlavor applied"
-    fi
-
-    if [[ "$DRY_RUN" == "true" ]]; then
-        cp "${KUEUE_DIR}/02-cluster-queue.yaml" "${DRY_RUN_DIR}/kueue/02-cluster-queue.yaml"
-        log_success "Copied: ${DRY_RUN_DIR}/kueue/02-cluster-queue.yaml"
-    else
-        oc apply -f "${KUEUE_DIR}/02-cluster-queue.yaml"
-        log_success "ClusterQueue applied"
-    fi
-
-    if [[ "$DRY_RUN" == "true" ]]; then
-        envsubst < "${KUEUE_DIR}/03-local-queue.yaml" > "${DRY_RUN_DIR}/kueue/03-local-queue.yaml"
-        log_success "Generated: ${DRY_RUN_DIR}/kueue/03-local-queue.yaml"
-    else
-        local temp_queue_file="${KUEUE_DIR}/03-local-queue-generated.yaml"
-        envsubst < "${KUEUE_DIR}/03-local-queue.yaml" > "$temp_queue_file"
-        oc apply -f "$temp_queue_file"
-        log_success "LocalQueue applied to namespace: ${NAMESPACE}"
-        rm -f "$temp_queue_file"
+        local temp_mgmt_file="${KUEUE_DIR}/00-management-cluster-setup-generated.yaml"
+        envsubst < "${KUEUE_DIR}/00-management-cluster-setup.yaml" > "$temp_mgmt_file"
+        oc apply -f "$temp_mgmt_file"
+        log_success "Management cluster resources applied (ResourceFlavor, ClusterQueue, LocalQueue)"
+        rm -f "$temp_mgmt_file"
     fi
 
     if [[ "$DRY_RUN" != "true" ]]; then
         echo -e "\n${GREEN}${BOLD}Kueue Configuration:${NC}"
-        echo -e "  ClusterQueue: ${CYAN}benchmark-cluster-queue${NC}"
+        echo -e "  ClusterQueue: ${CYAN}${CLUSTER_QUEUE_NAME:-multi-cluster-queue}${NC}"
         echo -e "  LocalQueue: ${CYAN}guidellm-jobs${NC} in namespace ${CYAN}${NAMESPACE}${NC}"
-        echo -e "  Resources: ${CYAN}50 CPU, 100Gi memory${NC}\n"
+        echo -e "  Ready for multi-cluster setup via: ${CYAN}./kueue/add-cluster.sh${NC}\n"
     fi
 
     echo ""

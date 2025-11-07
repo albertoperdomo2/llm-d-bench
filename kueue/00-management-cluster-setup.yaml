@@ -1,0 +1,39 @@
+---
+# Management Cluster Setup
+# Apply this ONCE on your management cluster where Kueue controller is running
+
+# 1. ResourceFlavor - defines available resource types
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+# 2. ClusterQueue - manages resources across all clusters
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: ${CLUSTER_QUEUE_NAME}
+spec:
+  namespaceSelector: {}
+  # admissionChecks will be added automatically by add-cluster.sh
+  admissionChecks: []
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: "cpu"
+              nominalQuota: 1000
+            - name: "memory"
+              nominalQuota: 1000Gi
+            - name: "nvidia.com/gpu"
+              nominalQuota: 100
+---
+# 3. LocalQueue in the benchmark namespace
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: guidellm-jobs
+  namespace: ${NAMESPACE}
+spec:
+  clusterQueue: ${CLUSTER_QUEUE_NAME}

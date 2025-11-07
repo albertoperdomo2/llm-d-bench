@@ -1,0 +1,62 @@
+# Qwen 0.6B Multi-Cluster Example
+# Demonstrates how to target a specific cluster via Kueue
+namespace: llm-d-inference-scheduling
+
+benchmark:
+  name: qwen-06b-multicluster
+
+  # Image configuration
+  image:
+    repository: "image-registry.openshift-image-registry.svc:5000/llm-d-inference-scheduling/guidellm-custom"
+    tag: "latest"
+    pullPolicy: Always
+
+  # No affinity selectors
+  affinity: null
+
+  # Target inference endpoint (update this to your actual endpoint)
+  target: http://infra-inference-scheduling-inference-gateway-istio.llm-d-inference-scheduling.svc.cluster.local:80
+
+  # Model configuration
+  model: Qwen/Qwen3-0.6B
+  processor: Qwen/Qwen3-0.6B
+
+  # Benchmark parameters
+  rateType: concurrent
+  rate: "1,10,50"
+  data: "prompt_tokens=1000,output_tokens=1000"
+  maxSeconds: "300"
+
+  # Environment variables
+  env:
+    GUIDELLM__REQUEST_TIMEOUT: "1000"
+    GUIDELLM__LOGGING__CONSOLE_LOG_LEVEL: "INFO"
+
+# MLflow experiment tracking configuration
+mlflow:
+  enabled: true
+  trackingUri: "https://mlflow-mlflow.apps.aperdomo-lab.ibm.rhperfscale.org"
+  experimentName: "qwen-0.6b-multicluster"
+
+  auth:
+    secretName: "mlflow-auth"
+    usernameKey: "admin-username"
+    passwordKey: "admin-password"
+
+  s3:
+    secretName: "mlflow-s3-secret"
+    accessKey: "access-key"
+    secretKey: "secret-key"
+    bucketNameKey: "bucket-name"
+    regionKey: "region"
+
+# Kueue multi-cluster configuration
+kueue:
+  enabled: true
+  queueName: "guidellm-jobs"
+
+  multiCluster:
+    enabled: true
+    # Target a specific cluster (must match a MultiKueueCluster name)
+    # Examples: cluster-east, cluster-west, gpu-h100-cluster, etc.
+    targetCluster: "cluster-east"
