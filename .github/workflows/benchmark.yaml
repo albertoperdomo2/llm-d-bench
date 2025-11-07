@@ -22,12 +22,38 @@ permissions:
   pull-requests: write
 
 jobs:
-  benchmark:
+  # Check if user has write access
+  check-permissions:
     if: |
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/benchmark') &&
-      github.actor == github.repository_owner
+      startsWith(github.event.comment.body, '/benchmark')
+    runs-on: ubuntu-latest
+    outputs:
+      has-permission: ${{ steps.check.outputs.has-permission }}
+    steps:
+      - name: Check user permissions
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const response = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: context.actor
+              });
+              const permission = response.data.permission;
+              const hasPermission = ['admin', 'write'].includes(permission);
+              core.setOutput('has-permission', hasPermission);
+              return hasPermission;
+            } catch (error) {
+              core.setOutput('has-permission', false);
+              return false;
+            }
 
+  benchmark:
+    needs: check-permissions
+    if: needs.check-permissions.outputs.has-permission == 'true'
     environment: benchmark
     runs-on: [self-hosted, openshift]
 
